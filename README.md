@@ -2,11 +2,11 @@
 
 **Build in public. Stay private. Get paid.**
 
-GhostCommits is a proposed privacy-first platform for submitting GitHub contributions through a bot, establishing pseudonymous contribution ownership, and receiving shielded Zcash bounty payments.
+GhostCommits is a developer workspace for bot-authored GitHub contributions, pseudonymous contribution ownership, and shielded Zcash testnet bounty requests.
 
 ## Project status
 
-Documentation only. Application implementation has not started. No integrations, wallet transfers, or privacy guarantees have been validated in this repository.
+Application source is implemented. At the user's request, no tests, build, preview, or live integration trials have been run. Behavior remains unverified until you run it yourself.
 
 The initial target is a one-day MVP for the Free Society Hack, Zcash Privacy Track, using Zcash testnet exclusively.
 
@@ -17,14 +17,14 @@ The initial target is a one-day MVP for the Free Society Hack, Zcash Privacy Tra
 - [Implementation plan](docs/IMPLEMENTATION_PLAN.md): future phases and acceptance checks.
 - [Privacy and security](docs/SECURITY.md): intended protections, limitations, and requirements.
 
-## Intended MVP
+## Implemented in source
 
 1. Generate a local signing identity and export a recovery key.
 2. Submit a patch to one configured repository through a GitHub bot.
 3. Verify the resulting PR's merge using GitHub evidence.
 4. Display verified contributions under a pseudonymous identity.
 5. Sign a bounty claim and have the sponsor approve a shielded testnet payment.
-6. Report payment progress accurately and demonstrate recipient receipt.
+6. Reserve payouts and record transaction IDs as unverified. Confirmation and receipt must be checked in the wallet; independent verification is not implemented.
 
 The MVP excludes mainnet, arbitrary repository support, trustless escrow, and zero-knowledge selective disclosure.
 
@@ -32,4 +32,67 @@ The MVP excludes mainnet, arbitrary repository support, trustless escrow, and ze
 
 The supplied PRD includes references to a "current prototype" and "current MVP." These are statements from the source document, not evidence of working software here. All capabilities remain planned until implemented and verified. External research and wallet compatibility claims in the PRD have not been independently checked during this documentation pass.
 
-Implementation should begin only after the user requests it.
+## Run locally
+
+Use Node.js 22.12 or later. Dependencies are installed; use `npm ci` when reinstalling.
+
+```powershell
+Copy-Item .env.example .env
+npm run dev
+```
+
+Open [the local workspace](http://localhost:5173). Vite uses port 5173 and proxies the API to port 3001. Without credentials, the interface shows a labeled sample bounty; identity generation and submission preparation are available, while publishing is disabled.
+
+Set these values in `.env` and restart:
+
+| Variable | Purpose |
+|---|---|
+| `GITHUB_TOKEN` | Fine-grained bot token with contents read/write and pull requests read/write for the selected repository. |
+| `GITHUB_REPOSITORY` | Existing controlled repository in `owner/name` form. |
+| `GITHUB_BASE_BRANCH` | Existing branch; defaults to `main`. |
+| `SPONSOR_TOKEN` | Long randomly generated sponsor access secret. |
+| `BOUNTY_TITLE`, `BOUNTY_DESCRIPTION` | Actual task details. |
+| `BOUNTY_CRITERIA` | Acceptance criteria separated by a pipe character. |
+| `BOUNTY_AMOUNT` | Positive testnet ZEC amount with up to eight decimal places. |
+| `BOUNTY_ISSUE_URL` | Optional GitHub issue URL. |
+| `APP_ORIGIN` | Exact browser origin; defaults to `http://localhost:5173`. |
+
+Do not commit `.env`. The bot creates branches in the configured repository; arbitrary repositories and fork workflows are unsupported. Each submission replaces one complete file on a new branch. Workflow files and Git internals are excluded. The review screen shows full file contents, not a calculated Git diff.
+
+## Identity and payouts
+
+Create a Ghost in **My Ghost** and export its recovery file. The MVP stores private keys unencrypted in browser storage. Recovery exports contain the private key; keep them private. Losing the key means losing access to that identity.
+
+After a maintainer merges your PR, use **Check merge status**, then review and sign a reward claim. Claims bind the origin, submission, reward, amount, receiving address, nonce, and expiry. One claim is allowed for this single-award bounty.
+
+Install the official [Noir Wallet testnet extension](https://docs.zknoir.com/noir-sdk-integration/), synchronize it, and fund it with shielded testnet ZEC. Open the sponsor desk, enter `SPONSOR_TOKEN`, connect the wallet, and review the work before approving. The integration follows the [Noir provider API](https://docs.zknoir.com/developers/provider-api/).
+
+Recipients must use a Sapling testnet address beginning `ztestsapling1`. Unified-address recipients are unsupported. Checksum validation follows [ZIP 173](https://zips.z.cash/zip-0173).
+
+The server reserves a claim before requesting wallet approval. Interrupted or declined requests leave the reservation in place to prevent duplicate transfers. Reconcile wallet history before recording a transaction. There is no automatic retry or reservation reset. Recovery beyond recording an existing transaction requires operator reconciliation with the server stopped and storage backed up.
+
+Recorded transactions remain **unverified**. Check confirmation and receipt in the wallet.
+
+## Production-style local serving
+
+When you are ready to build:
+
+```powershell
+npm run build
+```
+
+Set `APP_ORIGIN=http://localhost:3001` in `.env`, then run `npm start`. The backend serves `dist/` and the API. Remote deployment needs HTTPS, a reverse proxy to the loopback listener, the correct origin, and further security work. No deployment has been created.
+
+## Code organization
+
+- `src/main.js`: state, events, routes.
+- `src/views.js`: escaped screen templates.
+- `src/styles.css`: responsive visual system.
+- `src/identity.js`, `src/api.js`, `src/wallet.js`: keys, signed sessions, Noir integration.
+- `server/index.mjs`: routes and configuration.
+- `server/auth.mjs`, `server/github.mjs`, `server/zcash.mjs`: ownership, PRs, address checks.
+- `server/store.mjs`: serialized atomic JSON writes.
+
+Runtime records live in Git-ignored `data/`. Run one backend process per data directory. Sessions and challenges expire on restart; contributions, claims, and payout reservations persist. Storage contains sensitive receiving addresses and must not be made public.
+
+See [implementation status](docs/IMPLEMENTATION_STATUS.md) for scope and remaining limitations.

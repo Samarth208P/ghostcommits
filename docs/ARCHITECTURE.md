@@ -1,6 +1,6 @@
 # Proposed architecture
 
-Status: planning only. Derived from [the PRD](PRD.md); this document does not establish a working implementation or a finalized API.
+Status: original architecture proposal. Source implementation now exists; see [implementation status](IMPLEMENTATION_STATUS.md) for scope and limits. No runtime validation was performed, at the user's request.
 
 ## Components
 

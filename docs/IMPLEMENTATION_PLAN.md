@@ -1,6 +1,6 @@
 # Implementation plan
 
-Status: pending user instruction to begin building. All items below are future work, not completed capabilities.
+Status: implementation authorized and source added. Acceptance items remain unchecked because the user requested no tests or trial runs. See [implementation status](IMPLEMENTATION_STATUS.md) for scope and gaps.
 
 ## Phase 0: Validate prerequisites
 

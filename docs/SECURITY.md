@@ -1,6 +1,6 @@
 # Privacy and security requirements
 
-Status: proposed requirements for an unbuilt MVP. No security audit or implementation verification has taken place.
+Status: MVP requirements. Source implementation exists; no security audit, tests, or runtime verification has taken place. See [implementation status](IMPLEMENTATION_STATUS.md) for current limits.
 
 ## Intended privacy boundary
 
