@@ -169,7 +169,7 @@ export function bounties(state) {
             <span>Open source</span>
             <span>One repository</span>
             <span>Single award</span>
-            <span>Shielded Sapling</span>
+            <span>Shielded Zcash</span>
           </div>
           <div class="bounty-card-bottom">
             ${reward(b.amount)}
@@ -260,7 +260,7 @@ export function bountyDetail(state) {
           <hr/>
           <dl>
             <div><dt>Network</dt><dd>Zcash testnet</dd></div>
-            <div><dt>Payment type</dt><dd>Shielded Sapling</dd></div>
+            <div><dt>Payment type</dt><dd>Shielded Zcash</dd></div>
             <div><dt>Awards</dt><dd>Single winner</dd></div>
             <div><dt>Verification</dt><dd>Maintainer merge evidence</dd></div>
           </dl>
@@ -583,7 +583,7 @@ export function contributionsView(state) {
               Shielded testnet address
               <input name="address" required placeholder="ztestsapling1…" autocomplete="off" spellcheck="false"/>
             </label>
-            <p class="small muted">Use a Sapling testnet address. The sponsor sees this address to authorize payment.</p>
+            <p class="small muted">Use a unified (utest1) or Sapling testnet address. The sponsor sees this address to authorize payment.</p>
             <button type="button" class="button secondary full" data-action="recipient-wallet">Use my Noir Wallet address</button>
             <button class="button primary full">${icon('key')} Review reward claim</button>
           </form>
@@ -650,7 +650,7 @@ export function sponsorView(state) {
             <p>Verified merged PR #${e(claim.submission.pr.number)}</p>
             ${link(claim.submission.pr.url, 'Review contribution on GitHub', 'quiet-link')}
             <label class="address-label">
-              Receiving Sapling address
+              Receiving shielded address
               <code>${e(claim.address)}</code>
             </label>
           </div>
@@ -723,7 +723,7 @@ export function privacyView() {
         </div>
         <div>
           <strong>Zcash network</strong>
-          <span>The app requests a transfer from shielded testnet funds to a Sapling testnet address through Noir Wallet. It does not independently verify broadcast, shielding, confirmation, or receipt. Check the wallet for payment evidence.</span>
+          <span>The app requests a transfer from shielded testnet funds to a shielded testnet address through Noir Wallet. It does not independently verify broadcast, shielding, confirmation, or receipt. Check the wallet for payment evidence.</span>
         </div>
       </div>
       <h2>Identity persistence</h2>

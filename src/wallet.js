@@ -1,14 +1,14 @@
 import { getNoirWallet } from '@noir-wallet/sdk';
-import { isSaplingTestnetAddress } from '../server/zcash.mjs';
+import { isShieldedTestnetAddress } from '../server/zcash.mjs';
 
 function requireTestnet(account) {
   if (
     !account ||
-    !isSaplingTestnetAddress(account.shielded) ||
+    !isShieldedTestnetAddress(account.shielded) ||
     !/^(tm|t2)/.test(account.transparent || '')
   )
     throw new Error(
-      'Connect a Noir testnet account with a Sapling shielded address. Mainnet payments are disabled.',
+      'Connect a Noir testnet account with a shielded testnet address. Mainnet payments are disabled.',
     );
 }
 
@@ -21,8 +21,8 @@ function zatoshis(value) {
 
 export async function checkPayment(wallet, claim) {
   requireTestnet(await wallet.zcash.getAccounts());
-  if (!isSaplingTestnetAddress(claim.address))
-    throw new Error('Use a valid shielded Sapling testnet recipient.');
+  if (!isShieldedTestnetAddress(claim.address))
+    throw new Error('Use a valid shielded testnet recipient.');
   const amount = zatoshis(claim.amount);
   if (amount <= 0n) throw new Error('The reward must be positive.');
   const maximum = await wallet.zcash.getMaxTransfer({
@@ -45,8 +45,8 @@ export async function connectWallet() {
 }
 
 export async function sendPayment(wallet, claim) {
-  if (!isSaplingTestnetAddress(claim.address))
-    throw new Error('Only shielded Sapling testnet recipients are supported.');
+  if (!isShieldedTestnetAddress(claim.address))
+    throw new Error('Only shielded testnet recipients are supported.');
   const connection = await wallet.zcash.getAccounts();
   requireTestnet(connection);
   return wallet.zcash.sendTransaction({

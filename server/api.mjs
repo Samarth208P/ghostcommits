@@ -10,7 +10,7 @@ import {
   authenticate,
   authenticateSponsor,
 } from './auth.mjs';
-import { isSaplingTestnetAddress } from './zcash.mjs';
+import { isShieldedTestnetAddress } from './zcash.mjs';
 import {
   maintainer,
   maintainerConfigured,
@@ -289,12 +289,10 @@ export async function api(request, pathname, response) {
     const state = await snapshot();
     const submission = owned(state, input.submissionId, publicKey);
     if (!submission.evidence?.merged) fail('Verify the merged PR before requesting a reward.');
-    // Limit the MVP to checksum-validated Sapling testnet recipients.
-    const address = text(input.address, 'Shielded testnet address', 200);
-    if (!isSaplingTestnetAddress(address))
-      fail(
-        'Use a valid Sapling testnet address beginning ztestsapling1. Unified addresses are not supported in this MVP.',
-      );
+    // Accept validated shielded testnet addresses, including Noir unified addresses.
+    const address = text(input.address, 'Shielded testnet address', 1024);
+    if (!isShieldedTestnetAddress(address))
+      fail('Use a valid shielded testnet address beginning utest1 or ztestsapling1.');
     if (awardTaken(state, submission.bountyId))
       fail('This bounty already has a selected award.', 409);
     if (state.claims.some((c) => c.submissionId === submission.id))

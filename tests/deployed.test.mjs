@@ -1,3 +1,4 @@
+import { unifiedFixture } from './unified-fixture.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { generateKeyPairSync, sign, createHash } from 'node:crypto';
@@ -249,27 +250,7 @@ test('Netlify API: durable OAuth, tenant isolation, immutable bounties, revision
     (await call('/submissions/revise', { id: s.id, content: 'Too late' }, { token })).status,
     409,
   );
-  // Generate a valid synthetic Sapling checksum; no real user's address is used.
-  const alphabet = 'qpzry9x8gf2tvdw0s3jn54khce6mua7l';
-  const prefix = 'ztestsapling';
-  const data = Array(69).fill(0);
-  let checksum = 1;
-  for (const v of [...prefix]
-    .map((c) => c.charCodeAt(0) >> 5)
-    .concat(
-      0,
-      [...prefix].map((c) => c.charCodeAt(0) & 31),
-      data,
-      [0, 0, 0, 0, 0, 0],
-    )) {
-    const top = checksum >>> 25;
-    checksum = ((checksum & 0x1ffffff) << 5) ^ v;
-    [0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3].forEach((g, i) => {
-      if ((top >>> i) & 1) checksum ^= g;
-    });
-  }
-  checksum ^= 1;
-  const address = `${prefix}1${data.map((v) => alphabet[v]).join('')}${Array.from({ length: 6 }, (_, i) => alphabet[(checksum >>> (5 * (5 - i))) & 31]).join('')}`;
+  const address = unifiedFixture();
   const claims = [];
   for (const submission of submissions) {
     assert.equal((await call('/submissions/verify', { id: submission.id }, { token })).status, 200);

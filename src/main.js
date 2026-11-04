@@ -223,8 +223,6 @@ app.addEventListener('click', (event) => {
     }
     if (action === 'recipient-wallet') {
       const connected = await connectWallet();
-      if (!connected.account.shielded?.startsWith('ztestsapling1'))
-        throw new Error('Choose a Noir account with a Sapling testnet receiving address.');
       document.querySelector('#claim-form input[name="address"]').value =
         connected.account.shielded;
     }

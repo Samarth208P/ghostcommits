@@ -59,3 +59,24 @@ test('Noir requests shielded testnet funds and rejects insufficient funds or acc
     /valid shielded/,
   );
 });
+
+import { unifiedFixture } from './unified-fixture.mjs';
+test('Noir unified accounts can pay unified recipients from shielded funds', async () => {
+  const address = unifiedFixture();
+  const wallet = {
+    zcash: {
+      getAccounts: async () => ({ shielded: address, transparent: 'tmSyntheticTestOnly' }),
+      getMaxTransfer: async () => ({ maxAmount: '0.1' }),
+      sendTransaction: async (params) => {
+        assert.deepEqual(params, { to: address, amount: '0.001', fundingSource: 'shielded' });
+        return 'b'.repeat(64);
+      },
+    },
+  };
+  await checkPayment(wallet, { address, amount: '0.001' });
+  assert.equal(await sendPayment(wallet, { address, amount: '0.001' }), 'b'.repeat(64));
+  await assert.rejects(
+    sendPayment(wallet, { address: unifiedFixture({ prefix: 'u' }), amount: '0.001' }),
+    /Only shielded testnet/,
+  );
+});
