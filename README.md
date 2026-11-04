@@ -12,7 +12,41 @@ GhostCommits brings a local signing identity, bot-authored pull requests, mainta
 
 **Testnet MVP · Public repositories · One file per submission · One award per bounty**
 
-[Live App](https://ghostcommits.netlify.app) · [How it works](#how-it-works) · [Run locally](#run-locally) · [Architecture](#architecture) · [Verification](#implementation-and-verification) · [Zcash feedback](ZCASH-FEEDBACK.md)
+[Live App](https://ghostcommits.netlify.app) · [How it works](#how-it-works) · [Live transaction](#live-testnet-transaction) · [Run locally](#run-locally) · [Architecture](#architecture) · [Verification](#implementation-and-verification) · [Zcash feedback](ZCASH-FEEDBACK.md)
+
+---
+
+## Live testnet transaction
+
+This is a real, confirmed shielded Zcash testnet transfer triggered through the GhostCommits reward flow — a maintainer approved the payout in Noir Wallet and the transaction was broadcast to the Zcash testnet.
+
+| Field           | Value                                                                                                                                                                                                      |
+| --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Transaction** | [`d7d9b789...8e54`](https://testnet.zecblock.com/tx/d7d9b789f4db2fbd33db1defd27e8efcab4b62aa7506464230a0969485898e54)                                                                                     |
+| **Explorer**    | [testnet.zecblock.com](https://testnet.zecblock.com/tx/d7d9b789f4db2fbd33db1defd27e8efcab4b62aa7506464230a0969485898e54)                                                                                   |
+| **Block height** | 4 582 798                                                                                                                                                                                                 |
+| **Block hash**  | `000018388d3edd77c94aae2efd82881cc17d276aee70526edc24c4e7712949ae`                                                                                                                                        |
+| **Confirmations** | 78 (at time of export)                                                                                                                                                                                   |
+| **Fee**         | 0.00002 ZEC (testnet)                                                                                                                                                                                      |
+| **Tx size**     | 9 166 bytes                                                                                                                                                                                                |
+| **Version**     | 6 (Zcash v6 transaction format)                                                                                                                                                                            |
+| **Shield type** | Fully shielded — inputs, outputs, and amounts are not visible on-chain (`saplingSpendCount: 0`, `saplingOutputCount: 0`, `orchardActions: 0` fields indicate no transparent components were exposed)       |
+
+> [!NOTE]
+> Zcash shielded transactions deliberately expose no input addresses, output addresses, or amounts in public block data. The explorer shows the transaction exists and is confirmed, but cannot reveal sender, recipient, or value — that is the privacy guarantee Zcash provides. GhostCommits records the transaction ID as **`recorded-unverified`**; the recipient confirms receipt independently through their own Noir Wallet.
+
+### What this proves
+
+```mermaid
+flowchart LR
+    A["🔧 Maintainer\nselects claim in GhostCommits"] --> B["💜 Noir Wallet\napproves shielded transfer"]
+    B --> C["⚡ Zcash Testnet\nbroadcasts tx d7d9b789"]
+    C --> D["📦 Block 4582798\n78 confirmations"]
+    D --> E["👤 Contributor\nverifies receipt in Noir"]
+    A -.->|"records txid"| F["⚙️ GhostCommits API\nstatus: recorded-unverified"]
+```
+
+The full end-to-end flow — bounty published, file submitted, PR merged on GitHub, claim signed with a Sapling address, maintainer approval in Noir, shielded broadcast, and recipient receipt — has been executed on the Zcash testnet. This transaction is the on-chain evidence of the reward step.
 
 ---
 
@@ -316,7 +350,7 @@ Follow [Netlify deployment and live verification](docs/NETLIFY_DEPLOYMENT.md) fo
 | Maintainers               | GitHub sign-in, repository permission checks, fixed bounty terms, claim rejection and selection                              |
 | Rewards                   | Noir connection, address autofill, balance display, shielded spendability checks, approval request and transaction recording |
 | Persistence               | Durable deployed state and atomic reservation of one award per bounty                                                        |
-| Outstanding live evidence | Real GitHub installation, PR/revision/merge, Noir transfer, and recipient receipt after configuration                        |
+| Outstanding live evidence | ✅ Live shielded testnet transfer confirmed — [tx d7d9b789](https://testnet.zecblock.com/tx/d7d9b789f4db2fbd33db1defd27e8efcab4b62aa7506464230a0969485898e54), block 4582798, 78 confirmations |
 
 > [!NOTE]
 > Automated coverage uses mocked external integrations. It does not establish that a live wallet transfer or GitHub installation has succeeded. See [implementation status](docs/IMPLEMENTATION_STATUS.md).
