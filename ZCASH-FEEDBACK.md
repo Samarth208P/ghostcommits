@@ -28,6 +28,12 @@ We completed this end-to-end flow. The confirmed on-chain evidence:
 | **Fee** | 0.00002 ZEC (testnet) |
 | **Privacy** | Fully shielded — sender, recipient, and amount are not visible in block data |
 
+<p align="center">
+  <img src="docs/assets/noir-wallet-transfer.png" alt="Noir Wallet — Transaction Submitted 0.01 ZEC to utest1...scfn3j" width="340" />
+</p>
+
+The Noir Wallet extension confirmed the transfer: **0.01 ZEC** to `utest1...scfn3j`, transaction hash `d7d9b7...898e54`. This is the wallet-side evidence of the approval step that GhostCommits triggered via `@noir-wallet/sdk`.
+
 The integration required `@noir-wallet/sdk`, shielded spendability checks (`getMaxTransfer`, `fundingSource`), wallet-approved transfer requests, and manual transaction ID recording. Getting there took more effort than we expected.
 
 ---

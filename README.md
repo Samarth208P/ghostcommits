@@ -48,6 +48,12 @@ flowchart LR
 
 The full end-to-end flow — bounty published, file submitted, PR merged on GitHub, claim signed with a Sapling address, maintainer approval in Noir, shielded broadcast, and recipient receipt — has been executed on the Zcash testnet. This transaction is the on-chain evidence of the reward step.
 
+<p align="center">
+  <img src="docs/assets/noir-wallet-transfer.png" alt="Noir Wallet showing Transaction Submitted — 0.01 ZEC to utest1...scfn3j, tx d7d9b7...898e54" width="340" />
+</p>
+
+**Noir Wallet confirms:** `0.01 ZEC` sent to `utest1...scfn3j` · transaction hash `d7d9b7...898e54` · status: submitted.
+
 ---
 
 ## Why this should exist
