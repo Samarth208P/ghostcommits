@@ -5,16 +5,18 @@ import { fail } from './auth.mjs';
 const repository = process.env.GITHUB_REPOSITORY || '';
 const appId = process.env.GITHUB_APP_ID || '';
 const keyPath = process.env.GITHUB_APP_PRIVATE_KEY_PATH || '';
-export const appConfigured = Boolean(appId && keyPath && /^[\w.-]+\/[\w.-]+$/.test(repository));
+export const appConfigured = Boolean(appId && (keyPath || process.env.GITHUB_APP_PRIVATE_KEY));
 export let githubReady = false;
-let cachedToken;
-let pendingToken;
+const tokens = new Map();
+const pending = new Map();
 
 async function appJwt() {
-  if (!appConfigured) fail('Configure the GitHub App ID, private key path, and repository first.', 503);
+  if (!appConfigured) fail('Configure the GitHub App ID and private key first.', 503);
   let key;
   try {
-    key = createPrivateKey(await readFile(keyPath));
+    key = createPrivateKey(
+      process.env.GITHUB_APP_PRIVATE_KEY?.replace(/\\n/g, '\n') || (await readFile(keyPath)),
+    );
     if (key.asymmetricKeyType !== 'rsa') throw new Error('RSA key required');
   } catch {
     fail('The GitHub App private key could not be loaded. Check its PEM file and path.', 503);
@@ -40,38 +42,59 @@ export async function githubRequest(path, token, method = 'GET', body) {
   });
   if (!response.ok) {
     if ([401, 403, 404].includes(response.status)) {
-      cachedToken = null;
+      tokens.clear();
       githubReady = false;
     }
-    fail(`GitHub returned ${response.status}. Check the app installation, repository permissions, and base branch.`, 502);
+    fail(
+      `GitHub returned ${response.status}. Check the app installation, repository permissions, and base branch.`,
+      502,
+    );
   }
   return response.json();
 }
 
-export async function installationToken() {
+export async function installationToken(target = repository) {
+  if (!/^[A-Za-z0-9][\w.-]*\/[A-Za-z0-9_][\w.-]*$/.test(target)) fail('Invalid repository.');
+  let cachedToken = tokens.get(target);
+  let pendingToken = pending.get(target);
   if (cachedToken && cachedToken.expiresAt > Date.now() + 60000) return cachedToken.token;
   if (pendingToken) return pendingToken;
   pendingToken = (async () => {
     const jwt = await appJwt();
     // Discover the installation from GitHub, never from a browser-supplied ID.
-    const installation = await githubRequest(`/repos/${repository}/installation`, jwt);
-    if (installation.suspended_at || installation.permissions?.contents !== 'write' || installation.permissions?.pull_requests !== 'write')
-      fail('Install the app with Contents and Pull requests read/write access on this repository.', 503);
-    const result = await githubRequest(`/app/installations/${installation.id}/access_tokens`, jwt, 'POST', {
-      repositories: [repository.split('/')[1]],
-      permissions: { contents: 'write', pull_requests: 'write' },
-    });
-    if (!result.token || !Number.isFinite(Date.parse(result.expires_at))) fail('GitHub returned an invalid installation token.', 502);
+    const installation = await githubRequest(`/repos/${target}/installation`, jwt);
+    if (
+      installation.suspended_at ||
+      installation.permissions?.contents !== 'write' ||
+      installation.permissions?.pull_requests !== 'write'
+    )
+      fail(
+        'Install the app with Contents and Pull requests read/write access on this repository.',
+        503,
+      );
+    const result = await githubRequest(
+      `/app/installations/${installation.id}/access_tokens`,
+      jwt,
+      'POST',
+      {
+        repositories: [target.split('/')[1]],
+        permissions: { contents: 'write', pull_requests: 'write' },
+      },
+    );
+    if (!result.token || !Number.isFinite(Date.parse(result.expires_at)))
+      fail('GitHub returned an invalid installation token.', 502);
     cachedToken = { token: result.token, expiresAt: Date.parse(result.expires_at) };
+    tokens.set(target, cachedToken);
     return result.token;
   })();
+  pending.set(target, pendingToken);
   try {
     return await pendingToken;
   } catch (error) {
     githubReady = false;
     throw error;
   } finally {
-    pendingToken = null;
+    pending.delete(target);
   }
 }
 
@@ -83,9 +106,12 @@ export async function installationUrl() {
 
 export async function checkConnection() {
   githubReady = false;
-  cachedToken = null;
+  tokens.delete(repository);
   const token = await installationToken();
-  await githubRequest(`/repos/${repository}/git/ref/heads/${encodeURIComponent(process.env.GITHUB_BASE_BRANCH || 'main')}`, token);
+  await githubRequest(
+    `/repos/${repository}/git/ref/heads/${encodeURIComponent(process.env.GITHUB_BASE_BRANCH || 'main')}`,
+    token,
+  );
   githubReady = true;
   return { connected: true, repository };
 }

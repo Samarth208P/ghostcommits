@@ -9,7 +9,7 @@ import {
   sign,
 } from './identity.js';
 import { request, authenticated, clearSession } from './api.js';
-import { connectWallet, sendPayment } from './wallet.js';
+import { connectWallet, sendPayment, checkPayment } from './wallet.js';
 import {
   shell,
   bounties,
@@ -31,6 +31,10 @@ const state = {
   submissions: [],
   claims: [],
   sponsorToken: '',
+  maintainer: null,
+  repositories: [],
+  bountyRequestId: crypto.randomUUID(),
+  walletBalance: null,
   wallet: null,
   error: '',
   review: false,
@@ -55,6 +59,19 @@ function render() {
     return;
   }
   const route = state.route.split('/')[0];
+  const selected = state.config.bounties?.find((b) => b.id === state.route.split('/')[1]);
+  if (selected && ['bounty', 'submit'].includes(route)) state.config.bounty = selected;
+  if (route === 'submit' && state.draft.bountyId !== state.config.bounty.id) {
+    state.draft = {
+      title: '',
+      description: '',
+      path: '',
+      content: '',
+      requestId: crypto.randomUUID(),
+      bountyId: state.config.bounty.id,
+    };
+    state.review = false;
+  }
   const view =
     {
       bounties,
@@ -73,7 +90,7 @@ async function refreshContributions() {
   state.config = await request('/config');
 }
 async function refreshSponsor() {
-  if (state.sponsorToken)
+  if (state.sponsorToken || state.maintainer)
     state.claims = await request('/sponsor/claims', { authorization: state.sponsorToken });
 }
 function sponsor(path, data) {
@@ -115,6 +132,8 @@ async function initialize() {
   render();
   try {
     state.config = await request('/config');
+    state.maintainer = (await request('/maintainer')).user;
+    if (state.maintainer) await refreshSponsor();
     if (state.identity) {
       state.fingerprint = await fingerprint(state.identity);
       await refreshContributions();
@@ -197,6 +216,18 @@ app.addEventListener('click', (event) => {
       render();
       notify('Pull request is ready.');
     }
+    if (action === 'load-repositories') {
+      state.repositories = await sponsor('/repositories');
+      render();
+      notify(`${state.repositories.length} repositories available.`);
+    }
+    if (action === 'recipient-wallet') {
+      const connected = await connectWallet();
+      if (!connected.account.shielded?.startsWith('ztestsapling1'))
+        throw new Error('Choose a Noir account with a Sapling testnet receiving address.');
+      document.querySelector('#claim-form input[name="address"]').value =
+        connected.account.shielded;
+    }
     if (action === 'connect-github') {
       const result = await sponsor('/github/connect', {});
       state.githubInstallUrl = result.url;
@@ -214,6 +245,7 @@ app.addEventListener('click', (event) => {
     if (action === 'connect-wallet') {
       const connected = await connectWallet();
       state.wallet = connected.wallet;
+      state.walletBalance = await connected.wallet.zcash.getBalance().catch(() => null);
       render();
       notify('Testnet wallet connected.');
     }
@@ -222,6 +254,10 @@ app.addEventListener('click', (event) => {
       render();
     }
     if (action === 'lock-sponsor') {
+      await request('/maintainer/logout', { data: {} });
+      state.maintainer = null;
+      state.repositories = [];
+      state.walletBalance = null;
       state.sponsorToken = '';
       state.claims = [];
       state.wallet = null;
@@ -231,6 +267,7 @@ app.addEventListener('click', (event) => {
     if (action === 'pay') {
       const claim = state.claims.find((c) => c.id === button.dataset.id);
       if (!state.wallet) throw new Error('Connect a testnet wallet first.');
+      await checkPayment(state.wallet, claim);
       await sponsor('/reserve', { id: claim.id });
       try {
         const txid = await sendPayment(state.wallet, claim);
@@ -254,6 +291,28 @@ app.addEventListener('submit', (event) => {
   const form = event.target;
   const values = Object.fromEntries(new FormData(form));
   busy(form, async () => {
+    if (form.id === 'bounty-form') {
+      const result = await sponsor('/bounties', { ...values, requestId: state.bountyRequestId });
+      state.bountyRequestId = crypto.randomUUID();
+      state.config = await request('/config');
+      navigate(`bounty/${result.id}`);
+      notify('Bounty published. Share its link with contributors.');
+    }
+    if (form.classList.contains('revision-form')) {
+      await authenticated(state.identity, '/submissions/revise', {
+        id: form.dataset.id,
+        content: values.content,
+      });
+      await refreshContributions();
+      render();
+      notify('The existing pull request has been updated.');
+    }
+    if (form.classList.contains('reject-form')) {
+      await sponsor('/reject', { id: form.dataset.id, reason: values.reason });
+      await refreshSponsor();
+      render();
+      notify('Claim declined.');
+    }
     if (form.id === 'contribution-form') {
       Object.assign(state.draft, values);
       state.review = true;

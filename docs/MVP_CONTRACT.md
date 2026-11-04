@@ -1,3 +1,5 @@
+> Historical prototype notes. The Netlify MVP now uses maintainer GitHub sign-in, multiple public repositories, durable Postgres storage, revisions, and atomic award selection. See [current implementation status](IMPLEMENTATION_STATUS.md) and [deployment guide](NETLIFY_DEPLOYMENT.md) for current behavior and remaining live checks.
+
 # Final MVP contract and product audit
 
 Audited November 4, 2026 against the local source. This document defines the final MVP promise and release criteria. It supersedes the original PRD for MVP scope; it does not claim the outstanding work is implemented.

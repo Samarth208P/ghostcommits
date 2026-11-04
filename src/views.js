@@ -17,6 +17,7 @@ const labels = {
   'in-review': 'In review',
   merged: 'Merge verified',
   closed: 'Closed',
+  rejected: 'Not selected',
   'awaiting-sponsor': 'Awaiting sponsor',
   'payment-reserved': 'Payment reserved',
   'recorded-unverified': 'Transaction unverified',
@@ -24,7 +25,10 @@ const labels = {
 export const badge = (label, tone = '') =>
   `<span class="badge ${tone}"><span class="status-dot"></span>${e(label)}</span>`;
 const status = (item) =>
-  badge(labels[item.status] || item.status, item.status === 'merged' ? 'green' : item.status === 'closed' ? 'neutral' : 'amber');
+  badge(
+    labels[item.status] || item.status,
+    item.status === 'merged' ? 'green' : item.status === 'closed' ? 'neutral' : 'amber',
+  );
 const link = (url, title, className = '') =>
   `<a href="${e(url)}" class="${className}" target="_blank" rel="noopener noreferrer">${e(title)}${icon('external')}</a>`;
 const empty = (name, title, description, action = '') =>
@@ -107,6 +111,24 @@ export function shell(state, content) {
 }
 
 export function bounties(state) {
+  if (state.config.bounties)
+    return `
+    ${pageHeading('Good work. <span class="text-accent-red">Quiet identity.</span>', 'Contribute to public repositories. Receive maintainer-approved ZEC testnet rewards.', '<a class="button secondary" href="#sponsor">Publish a bounty</a>')}
+    <div class="notice"><p>No personal GitHub login is required to contribute. Rewards use Noir Wallet on Zcash testnet and have no monetary value. A merge does not guarantee a reward.</p></div>
+    <div class="bounty-catalog">${state.config.bounties
+      .map(
+        (b) => `
+      <a class="bounty-card" href="#bounty/${e(b.id)}">
+        <div class="card-top">${repo(b.repository)}${badge(b.awardAvailable ? 'Open for PRs' : 'Award selected', b.awardAvailable ? 'green' : 'neutral')}</div>
+        <h2>${e(b.title)}</h2><p>${e(b.description)}</p>
+        <p class="small muted">Maintained by ${e(b.maintainerLogin)} � One file per contribution</p>
+        <div class="bounty-card-bottom">${reward(b.amount)}${icon('arrow')}</div>
+      </a>`,
+      )
+      .join('')}</div>
+    ${!state.config.bounties.length ? empty('branch', 'Ready for the first bounty', 'Maintainers can sign in with GitHub, install the bot on a public repository, and publish a testnet reward.', '<a class="button primary" href="#sponsor">Connect your repository</a>') : ''}
+    ${privacyNote()}`;
+
   const b = state.config.bounty;
   return `
     <div class="live-pill animate-fade-up">
@@ -242,7 +264,7 @@ export function bountyDetail(state) {
             <div><dt>Awards</dt><dd>Single winner</dd></div>
             <div><dt>Verification</dt><dd>Maintainer merge evidence</dd></div>
           </dl>
-          <a class="button primary full" href="#${state.identity ? 'submit' : 'identity'}">
+          <a class="button primary full" href="#${state.identity ? `submit/${e(b.id)}` : 'identity'}">
             ${state.identity ? 'Start contribution' : 'Create Ghost to contribute'} ${icon('arrow')}
           </a>
           <p class="small muted">Your code and PR description are published under the bot. Repository visibility determines who can read them. Rewards require sponsor approval and are not held in escrow.</p>
@@ -295,13 +317,17 @@ export function identityView(state) {
       </div>
       ${badge('Local Key Active', 'green')}
     </div>
-    ${!state.identity.backedUp ? `
+    ${
+      !state.identity.backedUp
+        ? `
       <div class="notice amber">
         ${icon('key')}
         <div><strong>Keep a recovery copy.</strong> Losing this browser's key means losing access to your reputation and rewards.</div>
         <button class="button small-button secondary" data-action="export-key">Export key</button>
       </div>
-    ` : ''}
+    `
+        : ''
+    }
     <div class="profile-stats">
       <div><strong>${merged.length}</strong><span>Verified merged PRs</span></div>
       <div><strong>${new Set(merged.map((s) => s.repository)).size}</strong><span>Repositories contributed</span></div>
@@ -331,7 +357,7 @@ export function submitView(state) {
   if (!state.identity) return identityView(state);
   const d = state.draft;
   return `
-    <a class="back-link" href="#bounty">${icon('back')} Bounty details</a>
+    <a class="back-link" href="#bounty/${e(state.config.bounty.id)}">${icon('back')} Bounty details</a>
     ${pageHeading('Make your contribution.', 'One file. A meaningful change. Published under the GitHub bot.')}
     <div class="step-tabs">
       <span class="${!state.review ? 'selected' : ''}"><b>1</b> Prepare contribution</span>
@@ -339,7 +365,9 @@ export function submitView(state) {
     </div>
     <div class="editor-layout">
       <section class="panel editor-panel">
-        ${state.review ? `
+        ${
+          state.review
+            ? `
           <div class="editor-heading">
             <h2>${e(d.title)}</h2>
             ${badge('Ready to submit', 'neutral')}
@@ -363,7 +391,8 @@ export function submitView(state) {
               <button class="button primary" ${!state.config.bounty.configured ? 'disabled' : ''}>Create GitHub PR ${icon('arrow')}</button>
             </div>
           </form>
-        ` : `
+        `
+            : `
           <form id="contribution-form">
             <label>
               Pull request title
@@ -387,7 +416,8 @@ export function submitView(state) {
               <button class="button primary">Review contribution ${icon('arrow')}</button>
             </div>
           </form>
-        `}
+        `
+        }
       </section>
       <aside class="context-rail">
         <div class="submission-context panel">
@@ -411,7 +441,9 @@ export function submitView(state) {
 function contributionList(items) {
   return `
     <div class="contribution-list">
-      ${items.map((s) => `
+      ${items
+        .map(
+          (s) => `
         <a class="contribution-row" href="#contributions/${e(s.id)}">
           <span class="row-icon ${s.evidence?.merged ? 'green' : ''}">
             ${icon(s.evidence?.merged ? 'check' : 'branch')}
@@ -423,7 +455,9 @@ function contributionList(items) {
           ${status(s)}
           ${icon('arrow')}
         </a>
-      `).join('')}
+      `,
+        )
+        .join('')}
     </div>
   `;
 }
@@ -454,7 +488,9 @@ export function contributionsView(state) {
     [
       'Pull request created on GitHub',
       Boolean(s.pr),
-      s.pr ? `PR #${s.pr.number} · bot attribution` : 'PR creation is pending. You can retry with the same submission.',
+      s.pr
+        ? `PR #${s.pr.number} · bot attribution`
+        : 'PR creation is pending. You can retry with the same submission.',
     ],
     [
       'Merge checked against GitHub',
@@ -489,7 +525,9 @@ export function contributionsView(state) {
           ${status(s)}
         </div>
         <ol class="timeline">
-          ${steps.map(([title, done, description]) => `
+          ${steps
+            .map(
+              ([title, done, description]) => `
             <li class="${done ? 'completed' : ''}">
               <span class="timeline-marker">${icon(done ? 'check' : 'clock')}</span>
               <div>
@@ -497,12 +535,17 @@ export function contributionsView(state) {
                 <p>${e(description)}</p>
               </div>
             </li>
-          `).join('')}
+          `,
+            )
+            .join('')}
         </ol>
         <div class="detail-actions">
           ${s.pr ? `<button class="button secondary" data-action="verify" data-id="${e(s.id)}">${icon('branch')} Check merge status</button>` : `<button class="button secondary" data-action="retry-pr" data-id="${e(s.id)}">Retry PR creation</button>`}
         </div>
-        ${s.evidence?.sha ? `
+        ${s.pr && s.status === 'in-review' ? `<details class="evidence"><summary>Revise this contribution</summary><p>Read maintainer feedback on the public PR, then replace the same file here. Your Ghost remains the owner.</p>${link(s.pr.url, 'Read PR feedback')}<form class="revision-form" data-id="${e(s.id)}"><label>Updated ${e(s.path)}<textarea name="content" required maxlength="120000" rows="14" spellcheck="false">${e(s.content)}</textarea></label><button class="button primary">Update existing PR</button></form></details>` : ''}
+        ${
+          s.evidence?.sha
+            ? `
           <details class="evidence">
             <summary>View recorded merge evidence</summary>
             <dl>
@@ -511,32 +554,44 @@ export function contributionsView(state) {
               <dt>Verified timestamp</dt><dd>${e(s.evidence.checkedAt)}</dd>
             </dl>
           </details>
-        ` : ''}
+        `
+            : ''
+        }
       </section>
       <aside class="panel reward-panel">
         <h3>Contribution reward</h3>
-        ${reward(state.config.bounty.amount)}
+        ${reward(s.terms?.amount || state.config.bounty.amount)}
         <hr/>
-        ${s.claim ? `
+        ${
+          s.claim
+            ? `
           ${status(s.claim)}
           <p class="small muted">
-            ${s.claim.status === 'awaiting-sponsor' ? 'Your signed claim is queued for sponsor approval.' : s.claim.status === 'payment-reserved' ? 'The sponsor has reserved this payout.' : 'A transaction ID has been recorded. Check your wallet history.'}
+            ${s.claim.status === 'rejected' ? `Not selected: ${e(s.claim.reason)}` : s.claim.status === 'awaiting-sponsor' ? 'Your signed claim is queued for sponsor approval.' : s.claim.status === 'payment-reserved' ? 'The sponsor has reserved this payout.' : 'A transaction ID has been recorded. Check your wallet history.'}
           </p>
           ${s.claim.txid ? `<code class="fingerprint">${e(s.claim.txid)}</code>` : ''}
-        ` : state.config.bounty.awardAvailable === false ? `
+        `
+            : (state.config.bounties?.find((b) => b.id === s.bountyId) || state.config.bounty)
+                  .awardAvailable === false
+              ? `
           <p class="muted small">This bounty's single award has already been claimed.</p>
-        ` : s.evidence?.merged ? `
+        `
+              : s.evidence?.merged
+                ? `
           <form id="claim-form" data-id="${e(s.id)}">
             <label>
               Shielded testnet address
               <input name="address" required placeholder="ztestsapling1…" autocomplete="off" spellcheck="false"/>
             </label>
             <p class="small muted">Use a Sapling testnet address. The sponsor sees this address to authorize payment.</p>
+            <button type="button" class="button secondary full" data-action="recipient-wallet">Use my Noir Wallet address</button>
             <button class="button primary full">${icon('key')} Review reward claim</button>
           </form>
-        ` : `
+        `
+                : `
           <p class="muted small">Once the merge is verified, sign a claim with the identity that authored this patch.</p>
-        `}
+        `
+        }
       </aside>
     </div>
   `;
@@ -547,29 +602,28 @@ export function sponsorView(state) {
     'Back the work that matters.',
     'Review verified merged contributions and authorize shielded testnet rewards.',
   );
-  if (!state.sponsorToken)
+  if (!state.sponsorToken && !state.maintainer)
     return `
       ${heading}
       <div class="sponsor-login panel">
         <span class="empty-icon">${icon('wallet')}</span>
         <h2>Sponsor Desk</h2>
-        <p>Enter the sponsor access token configured on your server to manage claims and authorize payments.</p>
-        <form id="sponsor-login">
-          <label>
-            Sponsor access key
-            <input name="token" type="password" required autocomplete="off" placeholder="Enter your secret token"/>
-          </label>
-          <button class="button primary full">Open sponsor desk ${icon('arrow')}</button>
-        </form>
-        ${!state.config.sponsorConfigured ? '<p class="small muted">Set SPONSOR_TOKEN in your .env file to enable sponsor access.</p>' : ''}
+        <p>Sign in with your own GitHub account, install the bot on a repository you maintain, and publish a testnet bounty.</p>
+        ${state.config.maintainerConfigured ? '<a class="button primary full" href="/api/github/login">Continue with GitHub</a>' : '<p class="notice amber">GitHub sign-in is awaiting site configuration. The operator must add the GitHub App credentials in Netlify.</p>'}
+        ${state.config.sponsorConfigured ? '<details><summary>Legacy operator access</summary><form id="sponsor-login"><label>Access key<input name="token" type="password" required autocomplete="off"/></label><button class="button secondary">Open operator desk</button></form></details>' : ''}
       </div>
     `;
 
   return `
     ${heading}
-    <section class="panel"><h2>Connect your GitHub repository</h2><p>Install GhostCommits on ${e(state.config.bounty.repository)} to let the bot open pull requests. Contributors keep their Ghost identities.</p><p>${badge(state.config.bounty.configured ? 'Repository connected' : 'Connection not checked', state.config.bounty.configured ? 'green' : 'neutral')}</p>${state.config.githubAppConfigured ? `<div class="form-actions"><button class="button secondary" data-action="connect-github">Connect GitHub</button><button class="button secondary" data-action="check-github">Check connection</button></div>${state.githubInstallUrl ? `<p>${link(state.githubInstallUrl, 'Continue on GitHub', 'button primary')}</p><p class="small muted">Choose the repository on GitHub, approve installation, then return here and check the connection.</p>` : ''}` : '<p>Server setup is required. Follow docs/GITHUB_APP_SETUP.md to register your GitHub App and configure its credentials.</p>'}</section>
+    ${
+      state.maintainer
+        ? maintainerSetup(state)
+        : `    <section class="panel"><h2>Connect your GitHub repository</h2><p>Install GhostCommits on ${e(state.config.bounty.repository)} to let the bot open pull requests. Contributors keep their Ghost identities.</p><p>${badge(state.config.bounty.configured ? 'Repository connected' : 'Connection not checked', state.config.bounty.configured ? 'green' : 'neutral')}</p>${state.config.githubAppConfigured ? `<div class="form-actions"><button class="button secondary" data-action="connect-github">Connect GitHub</button><button class="button secondary" data-action="check-github">Check connection</button></div>${state.githubInstallUrl ? `<p>${link(state.githubInstallUrl, 'Continue on GitHub', 'button primary')}</p><p class="small muted">Choose the repository on GitHub, approve installation, then return here and check the connection.</p>` : ''}` : '<p>Server setup is required. Follow docs/GITHUB_APP_SETUP.md to register your GitHub App and configure its credentials.</p>'}</section>
+`
+    }
     <div class="sponsor-toolbar">
-      <span>${badge(state.wallet ? 'Noir Wallet connected' : 'Wallet disconnected', state.wallet ? 'green' : 'neutral')}</span>
+      <span>${badge(state.wallet ? 'Noir Wallet connected' : 'Wallet disconnected', state.wallet ? 'green' : 'neutral')}${state.walletBalance ? `<span class="small muted">Shielded balance: ${e(state.walletBalance.shielded)} testnet ZEC</span>` : ''}</span>
       <div class="sponsor-actions">
         <button class="button secondary" data-action="connect-wallet">${icon('wallet')} ${state.wallet ? 'Reconnect Noir Wallet' : 'Connect Noir Wallet'}</button>
         <button class="button secondary" data-action="refresh-sponsor">Refresh claims</button>
@@ -580,7 +634,11 @@ export function sponsorView(state) {
       ${icon('info')}
       <p>Payments use shielded testnet funds and require confirmation in Noir Wallet. A reservation blocks repeat payment attempts in this app. After an interruption, reconcile wallet history before taking further action.</p>
     </div>
-    ${state.claims.length ? state.claims.map((claim) => `
+    ${
+      state.claims.length
+        ? state.claims
+            .map(
+              (claim) => `
       <article class="panel sponsor-claim">
         <div class="card-top">
           <h2>${e(claim.submission?.title || 'Contribution reward')}</h2>
@@ -598,12 +656,17 @@ export function sponsorView(state) {
           </div>
           <div>
             ${reward(claim.amount)}
-            ${claim.status === 'awaiting-sponsor' ? `
+            ${
+              claim.status === 'awaiting-sponsor'
+                ? `
               <button class="button primary full" data-action="pay" data-id="${e(claim.id)}" ${!state.wallet ? 'disabled' : ''}>
                 ${icon('wallet')} Approve in wallet
               </button>
-              <p class="small muted">Approving signs a shielded transfer in Noir Wallet.</p>
-            ` : claim.status === 'payment-reserved' ? `
+              <p class="small muted">Selecting reserves this bounty's only award, then opens Noir Wallet for approval.</p>
+              <form class="reject-form" data-id="${e(claim.id)}"><label>Reason for declining<input name="reason" required maxlength="1000"/></label><button class="button secondary full">Decline claim</button></form>
+            `
+                : claim.status === 'payment-reserved'
+                  ? `
               <form class="record-form" data-id="${e(claim.id)}">
                 <label>
                   Transaction ID
@@ -612,14 +675,26 @@ export function sponsorView(state) {
                 <button class="button secondary full">Record transaction</button>
                 <p class="small muted">Record a transaction already broadcasted.</p>
               </form>
-            ` : `
+            `
+                  : claim.status === 'rejected'
+                    ? `<p>Not selected: ${e(claim.reason)}</p>`
+                    : `
               <code class="fingerprint">${e(claim.txid)}</code>
               <p class="small muted">Recorded, not independently confirmed. Verify receipt in the recipient wallet.</p>
-            `}
+            `
+            }
           </div>
         </div>
       </article>
-    `).join('') : empty('wallet', 'No claims waiting', 'Signed claims will appear here once contributors verify their merged pull requests.')}
+    `,
+            )
+            .join('')
+        : empty(
+            'wallet',
+            'No claims waiting',
+            'Signed claims will appear here once contributors verify their merged pull requests.',
+          )
+    }
   `;
 }
 
@@ -659,4 +734,27 @@ export function privacyView() {
       <p>This software operates on Zcash testnet. Testnet ZEC has no monetary value. Treat this MVP as an experimental privacy-preserving developer workflow.</p>
     </div>
   `;
+}
+
+function maintainerSetup(state) {
+  const mine = (state.config.bounties || []).filter((b) => b.maintainerId === state.maintainer.id);
+  return `<section class="panel maintainer-setup"><h2>Welcome, ${e(state.maintainer.login)}</h2>
+    <p>Install GhostCommits on a public repository where you have admin or maintainer access. Then refresh the list and publish a one-file task.</p>
+    <div class="form-actions"><button class="button secondary" data-action="connect-github">Install GitHub App</button><button class="button secondary" data-action="load-repositories">Refresh repositories</button></div>
+    ${state.githubInstallUrl ? `<p>${link(state.githubInstallUrl, 'Continue installation on GitHub', 'button primary')}</p>` : ''}
+    ${
+      state.repositories?.length
+        ? `<form id="bounty-form">
+      <label>Repository<select name="repository" required>${state.repositories.map((r) => `<option value="${e(r.repository)}">${e(r.repository)}</option>`).join('')}</select></label>
+      <label>Task title<input name="title" required maxlength="160" placeholder="Add a usage example to README.md"/></label>
+      <label>Description<textarea name="description" required maxlength="6000" rows="3"></textarea></label>
+      <label>Acceptance criteria (one per line)<textarea name="criteria" required maxlength="3000" rows="3"></textarea></label>
+      <label>Testnet ZEC reward<input name="amount" type="number" min="0.00000001" max="100" step="0.00000001" value="0.01" required/></label>
+      <p class="small muted">Terms are fixed when published. You fund the reward from your Noir testnet wallet when selecting a merged contribution. No funds are held in escrow.</p>
+      <button class="button primary">Publish bounty</button>
+    </form>`
+        : '<p class="small muted">Install the app, then refresh repositories. Only active public repositories you maintain are shown.</p>'
+    }
+    ${mine.length ? `<h3>Your published bounties</h3>${mine.map((b) => `<p><a href="#bounty/${e(b.id)}">${e(b.title)}</a> � ${e(b.amount)} testnet ZEC</p>`).join('')}` : ''}
+  </section>`;
 }

@@ -1,29 +1,54 @@
 import { getNoirWallet } from '@noir-wallet/sdk';
+import { isSaplingTestnetAddress } from '../server/zcash.mjs';
+
+function requireTestnet(account) {
+  if (
+    !account ||
+    !isSaplingTestnetAddress(account.shielded) ||
+    !/^(tm|t2)/.test(account.transparent || '')
+  )
+    throw new Error(
+      'Connect a Noir testnet account with a Sapling shielded address. Mainnet payments are disabled.',
+    );
+}
+
+function zatoshis(value) {
+  if (typeof value !== 'string' || !/^\d+(\.\d{1,8})?$/.test(value))
+    throw new Error('The wallet returned an invalid ZEC amount.');
+  const [whole, fraction = ''] = value.split('.');
+  return BigInt(whole) * 100000000n + BigInt(fraction.padEnd(8, '0'));
+}
+
+export async function checkPayment(wallet, claim) {
+  requireTestnet(await wallet.zcash.getAccounts());
+  if (!isSaplingTestnetAddress(claim.address))
+    throw new Error('Use a valid shielded Sapling testnet recipient.');
+  const amount = zatoshis(claim.amount);
+  if (amount <= 0n) throw new Error('The reward must be positive.');
+  const maximum = await wallet.zcash.getMaxTransfer({
+    to: claim.address,
+    fundingSource: 'shielded',
+  });
+  if (amount > zatoshis(maximum.maxAmount))
+    throw new Error(
+      'Insufficient spendable shielded testnet ZEC, including the network fee. Fund and synchronize Noir Wallet first.',
+    );
+}
 
 export async function connectWallet() {
   const wallet = getNoirWallet();
   if (!wallet)
     throw new Error('Install the official Noir Wallet testnet extension, then reload this page.');
   const account = await wallet.zcash.connect();
-  // Fail closed: never authorize a mainnet payout from this testnet-only app.
-  const addresses = [account.shielded, account.transparent].filter(
-    (value) => typeof value === 'string',
-  );
-  if (!addresses.some((address) => /^(ztestsapling1|utest1|tm|t2)/.test(address)))
-    throw new Error('Connect the testnet build of Noir Wallet. Mainnet payments are disabled.');
+  requireTestnet(account);
   return { wallet, account };
 }
 
 export async function sendPayment(wallet, claim) {
-  if (!claim.address.startsWith('ztestsapling1'))
+  if (!isSaplingTestnetAddress(claim.address))
     throw new Error('Only shielded Sapling testnet recipients are supported.');
   const connection = await wallet.zcash.getAccounts();
-  if (
-    ![connection?.shielded, connection?.transparent].some(
-      (value) => typeof value === 'string' && /^(ztestsapling1|utest1|tm|t2)/.test(value),
-    )
-  )
-    throw new Error('The active wallet is not on testnet.');
+  requireTestnet(connection);
   return wallet.zcash.sendTransaction({
     to: claim.address,
     amount: claim.amount,

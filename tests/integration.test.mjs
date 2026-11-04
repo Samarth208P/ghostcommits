@@ -87,7 +87,7 @@ test('isolated HTTP flow: authentication, validation, payout reservation and per
     return { status: response.status, body: await response.json() };
   };
   assert.equal((await call('/config')).body.bounty.configured, false);
-  assert.equal((await call('/config')).body.bounty.awardAvailable, false);
+  assert.equal((await call('/config')).body.bounty.awardAvailable, true);
   assert.equal((await call('/config', undefined, undefined, 'https://other.invalid')).status, 403);
   for (const input of [null, [], 'text', 1])
     assert.equal((await call('/auth/challenge', input)).status, 400);

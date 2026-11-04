@@ -1,3 +1,5 @@
+> Historical prototype notes. The Netlify MVP now uses maintainer GitHub sign-in, multiple public repositories, durable Postgres storage, revisions, and atomic award selection. See [current implementation status](IMPLEMENTATION_STATUS.md) and [deployment guide](NETLIFY_DEPLOYMENT.md) for current behavior and remaining live checks.
+
 # Privacy and security requirements
 
 Status: MVP requirements. Source implementation exists, and automated regression checks and the production build pass. No independent security audit has taken place; live GitHub and wallet verification remains outstanding. See [implementation status](IMPLEMENTATION_STATUS.md) for current limits.

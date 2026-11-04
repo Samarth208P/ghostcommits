@@ -1,13 +1,16 @@
 import { githubRequest, installationToken } from './github-app.mjs';
-const repository = process.env.GITHUB_REPOSITORY || '';
-const baseBranch = process.env.GITHUB_BASE_BRANCH || 'main';
-async function github(path, method = 'GET', body) {
-  return githubRequest(`/repos/${repository}${path}`, await installationToken(), method, body);
+function client(submission) {
+  const target = submission.repository;
+  if (!/^[A-Za-z0-9][\w.-]*\/[A-Za-z0-9_][\w.-]*$/.test(target))
+    throw new Error('Invalid repository.');
+  return async (path, method = 'GET', body) =>
+    githubRequest(`/repos/${target}${path}`, await installationToken(target), method, body);
 }
 
 export async function createPullRequest(submission) {
-  if (submission.repository.toLowerCase() !== repository.toLowerCase())
-    throw new Error('This contribution belongs to a different configured repository.');
+  const github = client(submission);
+  const repository = submission.repository;
+  const baseBranch = submission.baseBranch || process.env.GITHUB_BASE_BRANCH || 'main';
   const branch = `ghost/${submission.id}`;
   // Look up an existing PR first: retries must not create a second contribution.
   const existing = await github(
@@ -45,8 +48,9 @@ export async function createPullRequest(submission) {
 }
 
 export async function verifyMerge(submission) {
-  if (submission.repository.toLowerCase() !== repository.toLowerCase())
-    throw new Error('This contribution belongs to a different configured repository.');
+  const github = client(submission);
+  const repository = submission.repository;
+  const baseBranch = submission.baseBranch || process.env.GITHUB_BASE_BRANCH || 'main';
   const pr = await github(`/pulls/${submission.pr.number}`);
   if (
     pr.base?.repo?.full_name?.toLowerCase() !== submission.repository.toLowerCase() ||
@@ -62,4 +66,31 @@ export async function verifyMerge(submission) {
     sha: pr.merged ? pr.merge_commit_sha : null,
     checkedAt: new Date().toISOString(),
   };
+}
+
+export async function revisePullRequest(submission, content) {
+  const evidence = await verifyMerge(submission);
+  if (evidence.merged || evidence.closed)
+    throw Object.assign(new Error('Closed or merged PRs cannot be revised.'), { status: 409 });
+  const github = client(submission);
+  const branch = `ghost/${submission.id}`;
+  const head = await github(`/git/ref/heads/${encodeURIComponent(branch)}`);
+  const commit = await github(`/git/commits/${head.object.sha}`);
+  const tree = await github('/git/trees', 'POST', {
+    base_tree: commit.tree.sha,
+    tree: [{ path: submission.path, mode: '100644', type: 'blob', content }],
+  });
+  const identity = { name: 'GhostCommits Bot', email: 'ghostcommits@users.noreply.github.com' };
+  const created = await github('/git/commits', 'POST', {
+    message: `Revise: ${submission.title}`,
+    tree: tree.sha,
+    parents: [head.object.sha],
+    author: identity,
+    committer: identity,
+  });
+  await github(`/git/refs/heads/${encodeURIComponent(branch)}`, 'PATCH', {
+    sha: created.sha,
+    force: false,
+  });
+  return created.sha;
 }

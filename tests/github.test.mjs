@@ -89,7 +89,7 @@ test('GitHub installation, token caching, interrupted PR retry and merge verific
     await assert.rejects(github.verifyMerge(submission), /does not match/);
   }
   await assert.rejects(
-    github.createPullRequest({ ...submission, repository: 'other/repo' }),
-    /different configured repository/,
+    github.createPullRequest({ ...submission, repository: '../invalid' }),
+    /Invalid repository/,
   );
 });

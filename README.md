@@ -1,108 +1,63 @@
 # GhostCommits
 
-**Public code. A separate identity. Testnet rewards.**
+Public code. A separate identity. Testnet rewards.
 
-GhostCommits is a developer workspace for bot-authored GitHub contributions, pseudonymous contribution ownership, and shielded Zcash testnet bounty requests.
+GhostCommits lets maintainers sign in with their own GitHub account, install a GitHub App on a public repository, and publish a one-file bounty. Contributors use a local Ghost signing identity to open and revise bot-authored PRs without a personal GitHub login. After a merge, contributors sign reward requests and the maintainer selects one award for a shielded Zcash testnet transfer in Noir Wallet.
 
-The final MVP contract and release blockers are defined in [MVP scope and claim audit](docs/MVP_CONTRACT.md). A capability is not release-ready merely because source exists. This is a single-repository pilot, not a public bounty marketplace, anonymous portfolio service, or real-money payment product.
+## Deploy on Netlify
 
-## Project status
+See **[Netlify deployment and demo setup](docs/NETLIFY_DEPLOYMENT.md)** for the exact GitHub App settings, environment variables, and live walkthrough.
 
-Application source is implemented. The automated regression suite and production build pass. Browser interaction checks remain incomplete, and real GitHub and Noir Wallet flows still require live verification. See [implementation status](docs/IMPLEMENTATION_STATUS.md) for the current evidence and limits.
+Connect this repository in Netlify and deploy `main`. The committed `netlify.toml` builds the Vite frontend into `dist` and routes `/api/*` to a Netlify Function. `@netlify/database` and the committed SQL migration provision the durable Postgres store on supported Netlify accounts. No local backend or persistent filesystem is required on Netlify.
 
-The initial target is a one-day MVP for the Free Society Hack, Zcash Privacy Track, using Zcash testnet exclusively.
+The site operator registers one public GitHub App and configures its secrets. Each maintainer signs in on the site and installs that app on their own repositories. Maintainers do not share an operator password or paste GitHub tokens into the site.
 
-## Documentation
+Required function environment variables:
 
-- [Product requirements](docs/PRD.md): the supplied PRD, preserved verbatim.
-- [Proposed architecture](docs/ARCHITECTURE.md): components, data boundaries, and unresolved integration decisions.
-- [Implementation plan](docs/IMPLEMENTATION_PLAN.md): future phases and acceptance checks.
-- [Privacy and security](docs/SECURITY.md): intended protections, limitations, and requirements.
+- `APP_ORIGIN`: exact deployed HTTPS origin, without a trailing slash.
+- `GITHUB_APP_ID`, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`.
+- `GITHUB_APP_PRIVATE_KEY`: full PEM private key, stored as a Netlify secret.
+- `SESSION_ENCRYPTION_KEY`: 64 hexadecimal characters, generated once and kept stable.
 
-## Implemented in source
+Netlify supplies the database connection. Keep secrets out of `VITE_*` variables and out of Git. Adding or changing environment variables requires redeployment.
 
-1. Generate a local signing identity and export a recovery key.
-2. Submit a patch to one configured repository through a GitHub bot.
-3. Verify the resulting PR's merge using GitHub evidence.
-4. Display verified contributions under a pseudonymous identity.
-5. Sign a bounty claim and have the sponsor approve a shielded testnet payment.
-6. Reserve payouts and record transaction IDs as unverified. Confirmation and receipt must be checked in the wallet; independent verification is not implemented.
+## Demo workflow
 
-The MVP excludes mainnet, arbitrary repository support, trustless escrow, and zero-knowledge selective disclosure.
+1. Maintainer opens **Sponsor desk**, signs in with GitHub, installs the app, and refreshes repositories.
+2. Maintainer publishes a small task with acceptance criteria and a testnet ZEC reward. Published terms are immutable.
+3. Contributor creates a Ghost, exports a recovery key, chooses the bounty, and submits one complete file.
+4. Maintainer reviews on GitHub. Contributor reads feedback on the public PR and revises the same file from **My contributions**.
+5. Maintainer merges the PR; contributor checks merge status and signs a claim using their Noir testnet Sapling address.
+6. Maintainer connects a funded Noir testnet wallet, chooses an eligible claim, and approves the shielded transfer in the extension.
+7. Both parties check wallet history and recipient receipt. The app labels transaction IDs **recorded-unverified**; it does not claim independent chain confirmation.
 
-## Reading the PRD
+Multiple contributors may request review without locking the reward. Selection atomically reserves one award per bounty. A declined or interrupted wallet request leaves the reservation in place; check wallet history before recording an existing transaction. There is deliberately no automatic second send or reset.
 
-The supplied PRD is preserved as the original product proposal. Its checkboxes, prototype descriptions, and roadmap are not the current implementation status. In particular, GitHub App connection and wallet request code now exist, while live integrations remain unverified. Use the implementation status document to distinguish implemented, tested, and deferred capabilities. External research claims in the PRD have not been independently verified.
+## Local development
 
-## Run locally
+Requires Node 22.12+.
 
-Use Node.js 22.12 or later. Dependencies are installed; use `npm ci` when reinstalling.
-
-```powershell
-Copy-Item .env.example .env
+```sh
+npm ci
+# Copy .env.example to .env and set the GitHub App values for live integrations.
 npm run dev
 ```
 
-Open [the local workspace](http://localhost:5173). Vite uses port 5173 and proxies the API to port 3001. Without credentials, the interface shows a labeled sample bounty; identity generation and submission preparation are available, while publishing is disabled.
+Vite serves `http://localhost:5173` and proxies the backend. Without a database connection, local development uses Git-ignored `data/store.json`. One local backend process may own that file. Netlify always uses Postgres. Do not copy local prototype data to a public folder.
 
-Set these values in `.env` and restart:
-
-| Variable | Purpose |
-|---|---|
-| `GITHUB_APP_ID` | App ID from your registered GitHub App. |
-| `GITHUB_APP_PRIVATE_KEY_PATH` | Path to its private PEM signing key, kept outside public assets. |
-| `GITHUB_REPOSITORY` | Existing controlled repository in `owner/name` form. |
-| `GITHUB_BASE_BRANCH` | Existing branch; defaults to `main`. |
-| `SPONSOR_TOKEN` | Long randomly generated sponsor access secret. |
-| `BOUNTY_TITLE`, `BOUNTY_DESCRIPTION` | Actual task details. |
-| `BOUNTY_CRITERIA` | Acceptance criteria separated by a pipe character. |
-| `BOUNTY_AMOUNT` | Positive testnet ZEC amount with up to eight decimal places. |
-| `BOUNTY_ISSUE_URL` | Optional GitHub issue URL. |
-| `APP_ORIGIN` | Exact browser origin; defaults to `http://localhost:5173`. |
-
-Follow [GitHub App setup](docs/GITHUB_APP_SETUP.md) to register the app once, then connect it from the sponsor desk. Owners approve access on GitHub; contributors never need a GitHub login or personal access token. Check the connection again after restarting the backend.
-
-Do not commit `.env` or private PEM keys. The bot creates branches in the configured repository; arbitrary repositories and fork workflows are unsupported. Each submission replaces one complete file on a new branch. Workflow files and Git internals are excluded. The review screen shows full file contents, not a calculated Git diff.
-
-## Identity and payouts
-
-Create a Ghost in **My Ghost** and export its recovery file. The MVP stores private keys unencrypted in browser storage. Recovery exports contain the private key; keep them private. Losing the key means losing access to that identity.
-
-After a maintainer merges your PR, use **Check merge status**, then review and sign a reward claim. Claims bind the origin, submission, reward, amount, receiving address, nonce, and expiry. One claim is allowed for this single-award bounty. Retrying the same persisted claim with the same identity and signature returns the existing claim. The bounty displays whether its award has already been claimed; a claim is not proof of payment.
-
-Install the official [Noir Wallet testnet extension](https://docs.zknoir.com/noir-sdk-integration/), synchronize it, and fund it with shielded testnet ZEC. Open the sponsor desk, enter `SPONSOR_TOKEN`, connect the wallet, and review the work before approving. The integration follows the [Noir provider API](https://docs.zknoir.com/developers/provider-api/).
-
-Recipients must use a Sapling testnet address beginning `ztestsapling1`. Unified-address recipients are unsupported. Checksum validation follows [ZIP 173](https://zips.z.cash/zip-0173).
-
-The server reserves a claim before requesting wallet approval. Interrupted or declined requests leave the reservation in place to prevent duplicate transfers. Reconcile wallet history before recording a transaction. There is no automatic retry or reservation reset. Recovery beyond recording an existing transaction requires operator reconciliation with the server stopped and storage backed up.
-
-Recorded transactions remain **unverified**. Check confirmation and receipt in the wallet.
-
-## Production-style local serving
-
-When you are ready to build:
-
-```powershell
+```sh
+npm test
 npm run build
+npx playwright install chromium
+npm run test:browser
 ```
 
-Set `APP_ORIGIN=http://localhost:3001` in `.env`, then run `npm start`. The backend serves `dist/` and the API. Remote deployment needs HTTPS, a reverse proxy to the loopback listener, the correct origin, and further security work. No deployment has been created.
+The API regression suite runs against local JSON and an isolated Netlify Postgres-compatible test database, with mocked GitHub responses. Browser tests run against the built frontend with mocked API responses. These do not establish that a real GitHub installation or Noir transfer has completed; follow the live deployment checklist.
 
-## Code organization
+## Scope and privacy
 
-- `src/main.js`: state, events, routes.
-- `src/views.js`: escaped screen templates.
-- `src/styles.css`: responsive visual system.
-- `src/identity.js`, `src/api.js`, `src/wallet.js`: keys, signed sessions, Noir integration.
-- `server/index.mjs`: routes and configuration.
-- `server/auth.mjs`, `server/github.mjs`, `server/zcash.mjs`: ownership, PRs, address checks.
-- `server/store.mjs`: serialized atomic JSON writes.
+This is a demoable testnet MVP, not a production-audited payment service. Public repositories only; one file per submission; one award per bounty; Sapling testnet recipients (`ztestsapling1…`) only. Testnet ZEC has no monetary value. No mainnet, escrow, guaranteed funding, or automatic payment verification.
 
-Runtime records live in Git-ignored `data/`. Run one backend process per data directory. Sessions and challenges expire on restart; contributions, claims, and payout reservations persist. Storage contains sensitive receiving addresses and must not be made public.
+Ghost keys are stored unencrypted in browser storage and recovery exports. The bot removes the need for personal GitHub attribution; it does not hide public code, timing, network metadata from the operator, or the relationship between a Ghost and its claims. The maintainer and operator see reward addresses. GitHub user access tokens are encrypted at rest; HttpOnly cookies identify maintainer sessions. Sessions expire after at most eight hours and require GitHub sign-in again.
 
-See [implementation status](docs/IMPLEMENTATION_STATUS.md) for scope and remaining limitations.
-
-
-## Regression checks
-
-Run `npm test` for isolated API, client-session, rendering, and mocked GitHub integration checks. Tests use temporary storage and do not load `.env` or send GitHub/wallet requests. Run `npm run build` to verify the production bundle. These checks do not replace live GitHub installation and wallet validation.
+The demo stores its aggregate state in one locked Postgres row to serialize award decisions and PR retries. This favors correctness for a small pilot over throughput; split into indexed tables and background jobs before high-volume operation. Review [security boundaries](docs/SECURITY.md) and [current implementation status](docs/IMPLEMENTATION_STATUS.md).
