@@ -1,6 +1,8 @@
 import { handleApi } from '../../server/handler.mjs';
+import { withStorageContext } from '../../server/store.mjs';
 
-export default (request, context) => handleApi(request, context.ip);
+export default (request, context) =>
+  withStorageContext(context, () => handleApi(request, context.ip));
 export const config = {
   path: '/api/*',
   rateLimit: {

@@ -1,4 +1,4 @@
-> Historical prototype notes. The Netlify MVP now uses maintainer GitHub sign-in, multiple public repositories, durable Postgres storage, revisions, and atomic award selection. See [current implementation status](IMPLEMENTATION_STATUS.md) and [deployment guide](NETLIFY_DEPLOYMENT.md) for current behavior and remaining live checks.
+> Historical prototype notes. The Netlify MVP now uses maintainer GitHub sign-in, multiple public repositories, durable Netlify Blobs storage, revisions, and atomic award selection. See [current implementation status](IMPLEMENTATION_STATUS.md) and [deployment guide](NETLIFY_DEPLOYMENT.md) for current behavior and remaining live checks.
 
 # Final MVP contract and product audit
 

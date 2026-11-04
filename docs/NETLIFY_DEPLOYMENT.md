@@ -2,11 +2,11 @@
 
 ## 1. Connect the repository
 
-Import `Samarth208P/ghostcommits` into Netlify using Git integration. Deploy branch: `main`. The repository supplies the build command (`npm run build`), publish directory (`dist`), Node 22, function directory, API routing, and database migration.
+Import `Samarth208P/ghostcommits` into Netlify using Git integration. Deploy branch: `main`. The repository supplies the build command (`npm run build`), publish directory (`dist`), Node 22, function directory, and API routing.
 
-Use a Netlify account with Database support (Credit-based plans). The installed `@netlify/database` package enables automatic database provisioning and migrations. If Netlify reports that Database is unavailable for your account, resolve the account/plan requirement before expecting the API to work. A static-only deploy is insufficient.
+The backend uses Netlify Blobs for durable storage. There is no Postgres dependency, database provisioning step, or SQL migration. Blobs access is supplied automatically to Netlify Functions; no database connection string or storage token needs to be added. A static-only deploy is insufficient.
 
-Keep a stable production site URL. Do not use a deploy-preview URL as the production OAuth callback. Deploy previews receive a database branch that may contain copied production data; protect preview access before sharing them, and omit production GitHub credentials from preview contexts. This workflow does not need production secrets in previews.
+Keep a stable production site URL. Do not use a deploy-preview URL as the production OAuth callback. Production uses a site-wide Blobs store that persists across deployments. Previews use deploy-specific stores and cannot read or modify production records. Omit production GitHub credentials from preview contexts. This workflow does not need production secrets in previews.
 
 ## 2. Register one public GitHub App
 
@@ -47,15 +47,17 @@ Generate the encryption key locally:
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ```
 
-Keep it stable across deploys: existing encrypted GitHub tokens require the same key. Netlify supplies `NETLIFY_DB_URL` and chooses the correct database branch. Do not paste a production database URL into deploy-preview settings. Do not set `GITHUB_TOKEN`, `GITHUB_REPOSITORY`, or `SPONSOR_TOKEN` for the hosted maintainer flow.
+Keep it stable across deploys: existing encrypted GitHub tokens require the same key. Netlify supplies Blobs access automatically. No `NETLIFY_DB_URL` is required. Do not set `GITHUB_TOKEN`, `GITHUB_REPOSITORY`, or `SPONSOR_TOKEN` for the hosted maintainer flow.
 
 Redeploy after setting the variables. These values are runtime settings; `netlify.toml` cannot carry the secrets for you.
 
 ## 4. Check the deployed service
 
-Visit `/api/health`. Expect `ok: true`, `storage: "postgres"`, `githubConfigured: true`, and `network: "testnet"`.
+Visit `/api/health`. Expect `ok: true`, `storage: "blobs"`, `githubConfigured: true`, and `network: "testnet"`.
 
-- A database error usually means provisioning/migration did not finish. Inspect the Netlify deploy and function logs.
+- If an old build still attempts database provisioning, deploy the latest `main` commit with a cleared build cache. The current package manifest and repository contain no database dependency or migrations.
+- If Blobs access fails, inspect the function logs and confirm this is a Netlify Functions deployment. Do not put storage credentials in frontend variables.
+- Concurrent writes use a version check. A conflict returns HTTP 409 without overwriting newer data or automatically repeating the operation. Refresh and retry; after any attempted wallet transfer, inspect wallet history before taking another payment action.
 - `githubConfigured: false` means one of the required app values or encryption key is missing/invalid.
 - A GitHub callback error commonly means the registered URL and `APP_ORIGIN` differ. Use the exact same scheme and hostname.
 - An empty repository list means the app is not installed, installation is suspended, the repository is private/archived, or the signed-in user lacks admin/maintainer rights. Install the app, return to the desk, and refresh.
@@ -85,3 +87,7 @@ For a cancelled, failed, timed-out, or interrupted send: the reservation remains
 Record the production URL, GitHub PR URL, bot authorship check, revision/merge checks, successful reload, transaction ID, and recipient wallet receipt. Keep private keys, secrets, recovery files, and private wallet details out of public evidence. Automated tests use simulated GitHub/wallet responses and cannot replace these live checks.
 
 References: [GitHub App user access tokens](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/generating-a-user-access-token-for-a-github-app), [Noir provider API](https://docs.zknoir.com/developers/provider-api/).
+
+## Storage limits
+
+The small demo stores its aggregate state in one strongly consistent blob. Each mutation commits once using an ETag condition (or create-only for the first record). Conflicts fail explicitly instead of automatically repeating operations that may call GitHub. GitHub side effects are not rolled back if a later storage write conflicts: refresh and retry PR creation to discover an already-created PR. No wallet send begins until the payout reservation is successfully persisted. This design favors a low-traffic testnet demo; it is not a general relational database or a high-throughput payment service. Existing local JSON data is not automatically imported.

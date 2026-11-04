@@ -1,20 +1,33 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { generateKeyPairSync, sign, createHash } from 'node:crypto';
-import { NetlifyDB } from '@netlify/database-dev';
-import { resolve } from 'node:path';
+import { BlobsServer } from '@netlify/blobs/server';
+import { setEnvironmentContext } from '@netlify/blobs';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 
 test('Netlify API: durable OAuth, tenant isolation, immutable bounties, revisions and atomic awards', async (t) => {
-  const database = new NetlifyDB({ logger() {} });
-  process.env.NETLIFY_DB_URL = await database.start();
-  process.env.NETLIFY_DB_DRIVER = 'server';
-  await database.applyMigrations(resolve('netlify/database/migrations'));
+  const directory = await mkdtemp(join(tmpdir(), 'ghostcommits-blobs-'));
+  const blobs = new BlobsServer({ directory, logger() {} });
+  const serverAddress = await blobs.start();
+  const blobURL = `http://127.0.0.1:${serverAddress.port}`;
+  setEnvironmentContext({
+    siteID: 'test-site',
+    deployID: '0123456789abcdef01234567',
+    primaryRegion: 'us-east-2',
+    token: 'test-token',
+    edgeURL: blobURL,
+    uncachedEdgeURL: blobURL,
+  });
+  process.env.CONTEXT = 'production';
   const originalFetch = globalThis.fetch;
-  const stores = [];
+  let writes = Promise.resolve();
+  const versions = new Map();
   t.after(async () => {
     globalThis.fetch = originalFetch;
-    for (const store of stores) await store.closeStore();
-    await database.stop();
+    await blobs.stop();
+    await rm(directory, { recursive: true, force: true });
   });
   process.env.APP_ORIGIN = 'https://ghostcommits.example';
   process.env.GITHUB_APP_ID = '123';
@@ -32,6 +45,23 @@ test('Netlify API: durable OAuth, tenant isolation, immutable bounties, revision
   let revised = 0;
   globalThis.fetch = async (url, options = {}) => {
     const u = new URL(url);
+    if (u.origin === blobURL) {
+      // The filesystem emulator omits GET ETags and its check/write isn't atomic.
+      // Supply its own returned PUT ETag and serialize access to model the hosted contract.
+      const result = writes.then(async () => {
+        const response = await originalFetch(url, options);
+        if (options.method?.toUpperCase() === 'PUT' && response.ok)
+          versions.set(u.pathname, response.headers.get('etag'));
+        if (options.method?.toUpperCase() === 'GET' && response.ok && versions.has(u.pathname)) {
+          const headers = new Headers(response.headers);
+          headers.set('etag', versions.get(u.pathname));
+          return new Response(await response.arrayBuffer(), { status: response.status, headers });
+        }
+        return response;
+      });
+      writes = result.catch(() => {});
+      return result;
+    }
     const path = u.pathname;
     if (path === '/login/oauth/access_token') {
       assert.ok(JSON.parse(options.body).code_verifier);
@@ -94,7 +124,6 @@ test('Netlify API: durable OAuth, tenant isolation, immutable bounties, revision
   };
   const { default: handler } = await import('../netlify/functions/api.mjs');
   const store = await import('../server/store.mjs');
-  stores.push(store);
   const { snapshot, transact } = store;
   const call = async (path, data, { cookie, token, origin = process.env.APP_ORIGIN } = {}) => {
     const response = await handler(
@@ -107,7 +136,7 @@ test('Netlify API: durable OAuth, tenant isolation, immutable bounties, revision
         },
         body: data === undefined ? undefined : JSON.stringify(data),
       }),
-      { ip: 'test-client' },
+      { ip: 'test-client', deploy: { context: 'production' } },
     );
     return {
       status: response.status,
@@ -115,7 +144,7 @@ test('Netlify API: durable OAuth, tenant isolation, immutable bounties, revision
       body: response.status === 302 ? null : await response.json(),
     };
   };
-  assert.equal((await call('/health')).body.storage, 'postgres');
+  assert.equal((await call('/health')).body.storage, 'blobs');
   assert.equal((await call('/config')).body.maintainerConfigured, true);
   assert.equal((await call('/submissions', undefined, { token: '__proto__' })).status, 401);
   const begin = await call('/github/login');
@@ -289,9 +318,54 @@ test('Netlify API: durable OAuth, tenant isolation, immutable bounties, revision
   assert.equal((await call('/config')).body.bounties[0].awardAvailable, false);
   // A fresh store module reads durable data rather than a warm-instance cache.
   const fresh = await import(`../server/store.mjs?cold=${Date.now()}`);
-  stores.push(fresh);
   assert.equal((await fresh.snapshot()).claims.find((c) => c.id === selected.id).txid, txid);
   assert.ok((await fresh.snapshot()).sessions[token]);
+  const preview = await handler(new Request(`${process.env.APP_ORIGIN}/api/config`), {
+    ip: 'preview-client',
+    deploy: { context: 'deploy-preview' },
+  });
+  assert.deepEqual((await preview.json()).bounties, []);
+  assert.equal((await call('/config')).body.bounties.length, 1);
+  let effects = 0;
+  // A stale writer must fail instead of overwriting another instance or rerunning effects.
+  await assert.rejects(
+    transact(async (draft) => {
+      effects++;
+      draft.bounties[0].title = 'Must not persist';
+      await fresh.transact((other) => {
+        other.bounties[0].description = 'Concurrent durable update';
+      });
+    }),
+    (error) => error.status === 409,
+  );
+  assert.equal(effects, 1);
+  assert.equal((await snapshot()).bounties[0].title, input.title);
+  assert.equal((await snapshot()).bounties[0].description, 'Concurrent durable update');
+  let ready = 0;
+  let release;
+  const gate = new Promise((resolve) => {
+    release = resolve;
+  });
+  const previewContext = { deploy: { context: 'deploy-preview' } };
+  const firstWrites = await Promise.allSettled(
+    [store, fresh].map((instance, index) =>
+      instance.withStorageContext(previewContext, () =>
+        instance.transact(async (draft) => {
+          ready++;
+          if (ready === 2) release();
+          await gate;
+          draft.bounties.push({ id: `preview-${index}` });
+        }),
+      ),
+    ),
+  );
+  assert.equal(firstWrites.filter((r) => r.status === 'fulfilled').length, 1);
+  assert.equal(firstWrites.find((r) => r.status === 'rejected').reason.status, 409);
+  assert.equal(
+    (await store.withStorageContext(previewContext, () => snapshot())).bounties.length,
+    1,
+  );
+  assert.equal((await snapshot()).bounties[0].id, bounty.id);
   assert.equal((await call('/maintainer/logout', {}, { cookie })).status, 200);
   assert.equal((await call('/maintainer', undefined, { cookie })).body.user, null);
 });

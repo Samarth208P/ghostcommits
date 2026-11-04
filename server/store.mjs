@@ -1,24 +1,29 @@
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import { getDatabase } from '@netlify/database';
+import { getStore, getDeployStore } from '@netlify/blobs';
 import { AsyncLocalStorage } from 'node:async_hooks';
 
-const context = new AsyncLocalStorage();
-const remote = Boolean(process.env.NETLIFY || process.env.NETLIFY_DB_URL || globalThis.Netlify);
-let database;
-function db() {
-  if (!database) {
-    database = getDatabase();
-    database.pool.on('error', () => console.error('An idle database connection closed.'));
-  }
-  return database;
+const transaction = new AsyncLocalStorage();
+const deployment = new AsyncLocalStorage();
+const remote = Boolean(
+  process.env.NETLIFY ||
+  process.env.NETLIFY_BLOBS_CONTEXT ||
+  globalThis.Netlify ||
+  globalThis.netlifyBlobsContext,
+);
+export const storageMode = remote ? 'blobs' : 'local';
+
+export function withStorageContext(context, operation) {
+  return deployment.run(context.deploy?.context || 'preview', operation);
 }
-export async function closeStore() {
-  if (database) {
-    await database.pool.end();
-    database = undefined;
-  }
+
+function blobs() {
+  // Preview deployments must never read or overwrite production state.
+  const scope = deployment.getStore() || process.env.CONTEXT;
+  const options = { name: 'ghostcommits-state-v1', consistency: 'strong' };
+  return scope === 'production' ? getStore(options) : getDeployStore(options);
 }
+
 function normalize(value) {
   return Object.assign(
     {
@@ -37,54 +42,51 @@ function normalize(value) {
 const directory = resolve('data');
 const filename = resolve(directory, 'store.json');
 let queue = Promise.resolve();
-if (!remote) await mkdir(directory, { recursive: true });
 let state;
-try {
-  state = remote ? null : normalize(JSON.parse(await readFile(filename, 'utf8')));
-} catch (error) {
-  if (error.code !== 'ENOENT') throw error;
-  state = normalize({});
+if (!remote) {
+  await mkdir(directory, { recursive: true });
+  try {
+    state = normalize(JSON.parse(await readFile(filename, 'utf8')));
+  } catch (error) {
+    if (error.code !== 'ENOENT') throw error;
+    state = normalize({});
+  }
 }
 
 export async function snapshot() {
-  if (context.getStore()) return structuredClone(context.getStore());
-  if (remote) {
-    const { rows } = await db().pool.query('SELECT payload FROM ghostcommits_state WHERE id = 1');
-    if (!rows[0]) throw new Error('Database migration is missing.');
-    return normalize(rows[0].payload);
-  }
+  if (transaction.getStore()) return structuredClone(transaction.getStore());
+  if (remote) return normalize(await blobs().get('state', { type: 'json' }));
   return structuredClone(state);
 }
 
-// One server process owns this store. A failed write never changes in-memory state.
 export async function transact(operation) {
-  if (context.getStore()) return operation(context.getStore());
+  if (transaction.getStore()) return operation(transaction.getStore());
   if (remote) {
-    const client = await db().pool.connect();
-    try {
-      await client.query('BEGIN');
-      await client.query("SET LOCAL lock_timeout = '15s'");
-      const { rows } = await client.query(
-        'SELECT payload FROM ghostcommits_state WHERE id = 1 FOR UPDATE',
+    const store = blobs();
+    const entry = await store.getWithMetadata('state', { type: 'json' });
+    if (entry && !entry.etag) throw new Error('Storage did not return a version.');
+    const draft = normalize(entry?.data);
+    const value = await transaction.run(draft, () => operation(draft));
+    // Commit all changes (including nested challenge consumption) together.
+    // Never retry the callback: it may have performed a GitHub operation.
+    const result = await store.setJSON(
+      'state',
+      draft,
+      entry ? { onlyIfMatch: entry.etag } : { onlyIfNew: true },
+    );
+    if (!result.modified)
+      throw Object.assign(
+        new Error(
+          'Another request updated the workspace. Refresh and retry this request. If a wallet transfer was attempted, check wallet history before sending again.',
+        ),
+        { status: 409 },
       );
-      if (!rows[0]) throw new Error('Database migration is missing.');
-      const draft = normalize(rows[0].payload);
-      const value = await context.run(draft, () => operation(draft));
-      await client.query('UPDATE ghostcommits_state SET payload = $1::jsonb WHERE id = 1', [
-        JSON.stringify(draft),
-      ]);
-      await client.query('COMMIT');
-      return structuredClone(value);
-    } catch (error) {
-      await client.query('ROLLBACK');
-      throw error;
-    } finally {
-      client.release();
-    }
+    return structuredClone(value);
   }
+  // Local development has one process per data directory.
   const result = queue.then(async () => {
     const draft = structuredClone(state);
-    const value = await context.run(draft, () => operation(draft));
+    const value = await transaction.run(draft, () => operation(draft));
     await writeFile(`${filename}.tmp`, JSON.stringify(draft, null, 2), { mode: 0o600 });
     await rename(`${filename}.tmp`, filename);
     state = draft;

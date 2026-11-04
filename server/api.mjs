@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { snapshot, transact } from './store.mjs';
+import { snapshot, transact, storageMode } from './store.mjs';
 import { createPullRequest, verifyMerge, revisePullRequest } from './github.mjs';
 import { githubReady, appConfigured, installationUrl, checkConnection } from './github-app.mjs';
 import {
@@ -97,10 +97,7 @@ export async function api(request, pathname, response) {
     await snapshot();
     return {
       ok: true,
-      storage:
-        process.env.NETLIFY || process.env.NETLIFY_DB_URL || globalThis.Netlify
-          ? 'postgres'
-          : 'local',
+      storage: storageMode,
       githubConfigured: maintainerConfigured,
       network: 'testnet',
     };

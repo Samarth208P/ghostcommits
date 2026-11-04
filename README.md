@@ -8,7 +8,7 @@ GhostCommits lets maintainers sign in with their own GitHub account, install a G
 
 See **[Netlify deployment and demo setup](docs/NETLIFY_DEPLOYMENT.md)** for the exact GitHub App settings, environment variables, and live walkthrough.
 
-Connect this repository in Netlify and deploy `main`. The committed `netlify.toml` builds the Vite frontend into `dist` and routes `/api/*` to a Netlify Function. `@netlify/database` and the committed SQL migration provision the durable Postgres store on supported Netlify accounts. No local backend or persistent filesystem is required on Netlify.
+Connect this repository in Netlify and deploy `main`. The committed `netlify.toml` builds the Vite frontend into `dist` and routes `/api/*` to a Netlify Function. Netlify Blobs stores application state durably, without Postgres provisioning or SQL migrations. No local backend or persistent filesystem is required on Netlify.
 
 The site operator registers one public GitHub App and configures its secrets. Each maintainer signs in on the site and installs that app on their own repositories. Maintainers do not share an operator password or paste GitHub tokens into the site.
 
@@ -19,7 +19,7 @@ Required function environment variables:
 - `GITHUB_APP_PRIVATE_KEY`: full PEM private key, stored as a Netlify secret.
 - `SESSION_ENCRYPTION_KEY`: 64 hexadecimal characters, generated once and kept stable.
 
-Netlify supplies the database connection. Keep secrets out of `VITE_*` variables and out of Git. Adding or changing environment variables requires redeployment.
+Netlify supplies Blobs access automatically; no database connection string is needed. Keep secrets out of `VITE_*` variables and out of Git. Adding or changing environment variables requires redeployment.
 
 ## Demo workflow
 
@@ -43,7 +43,7 @@ npm ci
 npm run dev
 ```
 
-Vite serves `http://localhost:5173` and proxies the backend. Without a database connection, local development uses Git-ignored `data/store.json`. One local backend process may own that file. Netlify always uses Postgres. Do not copy local prototype data to a public folder.
+Vite serves `http://localhost:5173` and proxies the backend. Outside Netlify, local development uses Git-ignored `data/store.json`. One local backend process may own that file. Netlify uses Blobs with conditional writes. Do not copy local prototype data to a public folder.
 
 ```sh
 npm test
@@ -52,7 +52,7 @@ npx playwright install chromium
 npm run test:browser
 ```
 
-The API regression suite runs against local JSON and an isolated Netlify Postgres-compatible test database, with mocked GitHub responses. Browser tests run against the built frontend with mocked API responses. These do not establish that a real GitHub installation or Noir transfer has completed; follow the live deployment checklist.
+The API regression suite runs against local JSON and an isolated local Blobs test service, with mocked GitHub responses. Browser tests run against the built frontend with mocked API responses. These do not establish that a real GitHub installation or Noir transfer has completed; follow the live deployment checklist.
 
 ## Scope and privacy
 
@@ -60,4 +60,4 @@ This is a demoable testnet MVP, not a production-audited payment service. Public
 
 Ghost keys are stored unencrypted in browser storage and recovery exports. The bot removes the need for personal GitHub attribution; it does not hide public code, timing, network metadata from the operator, or the relationship between a Ghost and its claims. The maintainer and operator see reward addresses. GitHub user access tokens are encrypted at rest; HttpOnly cookies identify maintainer sessions. Sessions expire after at most eight hours and require GitHub sign-in again.
 
-The demo stores its aggregate state in one locked Postgres row to serialize award decisions and PR retries. This favors correctness for a small pilot over throughput; split into indexed tables and background jobs before high-volume operation. Review [security boundaries](docs/SECURITY.md) and [current implementation status](docs/IMPLEMENTATION_STATUS.md).
+The demo stores aggregate state in one strongly consistent blob. Conditional writes reject stale updates with HTTP 409, without automatically replaying GitHub operations. Production records persist across deploys and previews use isolated stores. This is intended for a small, low-traffic testnet pilot. Review [security boundaries](docs/SECURITY.md) and [current implementation status](docs/IMPLEMENTATION_STATUS.md).
