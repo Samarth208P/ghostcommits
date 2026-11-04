@@ -1,5 +1,6 @@
 import '@fontsource-variable/inter';
 import './styles.css';
+import { closeHelp } from './help.js';
 import {
   loadIdentity,
   createIdentity,
@@ -23,7 +24,16 @@ import {
 } from './views.js';
 import { icon } from './icons.js';
 
+function savedSidebarPreference() {
+  try {
+    return localStorage.getItem('ghostcommits.sidebar-collapsed') === 'true';
+  } catch {
+    return false;
+  }
+}
+
 const state = {
+  sidebarCollapsed: savedSidebarPreference(),
   route: location.hash.slice(1) || 'bounties',
   config: null,
   identity: loadIdentity(),
@@ -51,9 +61,16 @@ function notify(message, error = false) {
   node.className = `toast ${error ? 'toast-error' : ''}`;
   node.textContent = message;
   document.querySelector('#notifications').append(node);
-  setTimeout(() => node.remove(), error ? 10000 : 5000);
+  setTimeout(
+    () => {
+      node.classList.add('leaving');
+      setTimeout(() => node.remove(), 200);
+    },
+    error ? 10000 : 5000,
+  );
 }
 function render() {
+  closeHelp();
   if (!state.config) {
     app.innerHTML = `<div class="boot-state"><img src="/ghost.svg" width="48" height="48" alt=""/><h1>GhostCommits</h1><p>${escape(state.error || 'Opening your workspace…')}</p>${state.error ? '<button class="button primary" data-action="reload">Retry connection</button>' : '<div class="loading-bar"></div>'}</div>`;
     return;
@@ -83,6 +100,10 @@ function render() {
       privacy: privacyView,
     }[route] || bounties;
   app.innerHTML = shell(state, view(state));
+  app.querySelector('main')?.animate([{ opacity: 0.82 }, { opacity: 1 }], {
+    duration: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 100 : 160,
+    easing: 'cubic-bezier(0.23, 1, 0.32, 1)',
+  });
   document.title = `${{ bounties: 'Discover', bounty: 'Bounty', identity: 'My Ghost', submit: 'New contribution', contributions: 'Contributions', sponsor: 'Sponsor desk', privacy: 'Privacy' }[route] || 'Workspace'} · GhostCommits`;
 }
 async function refreshContributions() {
@@ -144,7 +165,45 @@ async function initialize() {
   render();
 }
 
+function toggleSidebar(button) {
+  closeHelp();
+  const shell = app.querySelector('.app-shell');
+  const workspace = app.querySelector('.workspace');
+  const sidebar = app.querySelector('.sidebar');
+  const before = workspace.getBoundingClientRect();
+  workspace.getAnimations().forEach((animation) => animation.cancel());
+  state.sidebarCollapsed = !state.sidebarCollapsed;
+  shell.classList.toggle('sidebar-retracted', state.sidebarCollapsed);
+  sidebar.inert = state.sidebarCollapsed;
+  if (state.sidebarCollapsed) sidebar.setAttribute('aria-hidden', 'true');
+  else sidebar.removeAttribute('aria-hidden');
+  const label = `${state.sidebarCollapsed ? 'Expand' : 'Collapse'} sidebar`;
+  button.setAttribute('aria-expanded', String(!state.sidebarCollapsed));
+  button.setAttribute('aria-label', label);
+  button.title = label;
+  try {
+    localStorage.setItem('ghostcommits.sidebar-collapsed', String(state.sidebarCollapsed));
+  } catch {
+    // The toggle still works when browser storage is unavailable.
+  }
+  if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    const after = workspace.getBoundingClientRect();
+    workspace.animate(
+      [
+        { transform: `translate(${before.left - after.left}px, ${before.top - after.top}px)` },
+        { transform: 'translate(0, 0)' },
+      ],
+      { duration: 200, easing: 'cubic-bezier(0.23, 1, 0.32, 1)' },
+    );
+  }
+}
+
 app.addEventListener('click', (event) => {
+  const toggle = event.target.closest('[data-sidebar-toggle]');
+  if (toggle) {
+    toggleSidebar(toggle);
+    return;
+  }
   if (!event.target.closest('.skip-link')) return;
   event.preventDefault();
   document.querySelector('#main')?.focus();
@@ -192,6 +251,7 @@ app.addEventListener('click', (event) => {
       state.fingerprint = await fingerprint(state.identity);
       clearSession();
       render();
+      window.scrollTo({ top: 0 });
       notify('Your Ghost identity is ready. Export a recovery copy.');
     }
     if (action === 'export-key') {

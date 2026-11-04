@@ -6,6 +6,10 @@ export const escape = (value) =>
     (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char],
   );
 const e = escape;
+const help = (label, text) =>
+  `<button type="button" class="info-button" aria-label="${e(label)}" data-help="${e(text)}">${icon('info')}</button>`;
+const guidance = (label, text) =>
+  `<div class="inline-guidance"><span>${label}</span>${help(label, text)}</div>`;
 const date = (value) =>
   new Date(value).toLocaleDateString(undefined, {
     month: 'short',
@@ -35,11 +39,11 @@ const empty = (name, title, description, action = '') =>
   `<div class="empty-state"><span class="empty-icon">${icon(name)}</span><h3>${title}</h3><p>${description}</p>${action}</div>`;
 const repo = (name) => `<span class="repository">${icon('book')}<span>${e(name)}</span></span>`;
 const reward = (amount) =>
-  `<div class="reward-wrap"><span class="reward-number">${e(amount)} <span class="reward-currency">ZEC</span></span><span class="muted small reward-note">Shielded testnet reward · no monetary value</span></div>`;
+  `<div class="reward-wrap"><span class="reward-number">${e(amount)} <span class="reward-currency">ZEC</span></span><span class="muted small reward-note">Testnet reward · no monetary value</span></div>`;
 const pageHeading = (title, description, action = '') =>
   `<div class="page-heading"><div><h1>${title}</h1><p>${description}</p></div>${action}</div>`;
 const privacyNote = () =>
-  `<div class="privacy-note">${icon('shield')}<div><strong>Your work speaks for you.</strong><p>Your code is public. Your personal GitHub account isn't required. The operator can still associate submissions and payments.</p><a href="#privacy">Understand privacy boundaries ${icon('arrow')}</a></div></div>`;
+  `<div class="privacy-note">${icon('shield')}<div><div class="inline-guidance"><strong>Your work speaks for you.</strong>${help('About your privacy', "Your code is public. Your personal GitHub account isn't required. Your activity remains linked to your Ghost. The operator can still associate submissions and payments.")}</div><a href="#privacy">Understand privacy boundaries ${icon('arrow')}</a></div></div>`;
 
 export function shell(state, content) {
   const page = state.route.split('/')[0];
@@ -47,13 +51,9 @@ export function shell(state, content) {
     `<a href="#${href}" class="nav-item ${active ? 'active' : ''}" ${active ? 'aria-current="page"' : ''}>${icon(symbol)}<span>${name}</span>${href === 'contributions' && state.submissions.length ? `<span class="nav-count">${state.submissions.length}</span>` : ''}</a>`;
   return `
     <a class="skip-link" href="#main">Skip to content</a>
-    <div class="app-shell">
-      <aside class="sidebar">
+    <div class="app-shell ${state.sidebarCollapsed ? 'sidebar-retracted' : ''}">
+      <aside class="sidebar" id="workspace-sidebar" ${state.sidebarCollapsed ? 'inert aria-hidden="true"' : ''}>
         <a class="brand" href="#bounties">
-          <div class="brand-gem-wrap">
-            <img src="/ghost.svg" alt="" width="32" height="32"/>
-            <div class="brand-gem"></div>
-          </div>
           <span class="brand-name">GhostCommits<span class="brand-period">.</span></span>
         </a>
         <div class="workspace-label">YOUR WORKSPACE</div>
@@ -86,10 +86,14 @@ export function shell(state, content) {
       </aside>
       <div class="workspace">
         <header class="topbar">
+          <div class="topbar-left">
+            <button type="button" class="sidebar-toggle" data-sidebar-toggle aria-controls="workspace-sidebar" aria-expanded="${!state.sidebarCollapsed}" aria-label="${state.sidebarCollapsed ? 'Expand' : 'Collapse'} sidebar" title="${state.sidebarCollapsed ? 'Expand' : 'Collapse'} sidebar">${icon('sidebar')}</button>
+            <a class="topbar-brand brand-name" href="#bounties">GhostCommits<span class="brand-period">.</span></a>
           <div class="breadcrumb">
             <span>Workspace</span>
             <span class="breadcrumb-slash">/</span>
             <strong>${{ bounties: 'Discover', bounty: 'Bounty details', submit: 'New contribution', contributions: 'Contributions', identity: 'My Ghost', sponsor: 'Sponsor desk', privacy: 'Privacy dossier' }[page] || 'Discover'}</strong>
+          </div>
           </div>
           <div class="topbar-right">
             ${badge('Testnet', 'neutral')}
@@ -114,14 +118,14 @@ export function bounties(state) {
   if (state.config.bounties)
     return `
     ${pageHeading('Good work. <span class="text-accent-red">Quiet identity.</span>', 'Contribute to public repositories. Receive maintainer-approved ZEC testnet rewards.', '<a class="button secondary" href="#sponsor">Publish a bounty</a>')}
-    <div class="notice"><p>No personal GitHub login is required to contribute. Rewards use Noir Wallet on Zcash testnet and have no monetary value. A merge does not guarantee a reward.</p></div>
+    <div class="catalog-meta"><span>${icon('grid')} Available bounties <span class="catalog-count">${state.config.bounties.length}</span></span>${guidance('How it works', 'No personal GitHub login is required to contribute. Submit one file through the repository bot using your local Ghost identity. Rewards use Noir Wallet on Zcash testnet and have no monetary value. A merge does not guarantee a reward; the maintainer must approve it.')}</div>
     <div class="bounty-catalog">${state.config.bounties
       .map(
         (b) => `
       <a class="bounty-card" href="#bounty/${e(b.id)}">
         <div class="card-top">${repo(b.repository)}${badge(b.awardAvailable ? 'Open for PRs' : 'Award selected', b.awardAvailable ? 'green' : 'neutral')}</div>
         <h2>${e(b.title)}</h2><p>${e(b.description)}</p>
-        <p class="small muted">Maintained by ${e(b.maintainerLogin)} � One file per contribution</p>
+        <p class="small muted">Maintained by ${e(b.maintainerLogin)} · One file per contribution</p>
         <div class="bounty-card-bottom">${reward(b.amount)}${icon('arrow')}</div>
       </a>`,
       )
@@ -148,7 +152,7 @@ export function bounties(state) {
       <div class="intro-mark">${icon('ghost')}</div>
       <div class="intro-content">
         <strong>Public contributions. Pseudonymous ownership.</strong>
-        <p>Submit one file through the repository bot, prove control of your Ghost identity, and request a sponsor-approved testnet reward.</p>
+        ${guidance('One file. Your Ghost. A verifiable contribution.', 'Submit one file through the repository bot, prove control of your Ghost identity, and request a sponsor-approved testnet reward.')}
       </div>
       <a href="#identity" class="intro-action">${state.identity ? 'View your Ghost' : 'Create your Ghost'} ${icon('arrow')}</a>
     </div>
@@ -176,10 +180,7 @@ export function bounties(state) {
             <span class="card-arrow" aria-label="View bounty">${icon('arrow')}</span>
           </div>
         </a>
-        <div class="subtle-callout">
-          ${icon('info')}
-          <p>${b.configured ? 'Rewards are subject to published criteria and sponsor approval. Only verified merged PRs are eligible for payout.' : 'This is a sample bounty from the product specification. Configure your GitHub repository to accept real contributions.'}</p>
-        </div>
+        <div class="subtle-callout">${guidance(b.configured ? 'Reward eligibility' : 'About this sample', b.configured ? 'Rewards are subject to published criteria and sponsor approval. Only verified merged PRs are eligible for payout.' : 'This is a sample bounty from the product specification. Configure your GitHub repository to accept real contributions.')}</div>
         <section class="recent-section">
           <div class="section-heading">
             <h2>Your contributions</h2>
@@ -195,29 +196,25 @@ export function bounties(state) {
             <li>
               <span>${icon('ghost')}</span>
               <div>
-                <strong>Make it yours</strong>
-                <p>Generate a local keypair. Keep the recovery file.</p>
+                <div class="inline-guidance"><strong>Make it yours</strong>${help('About your Ghost identity', 'Generate a local keypair. Keep the recovery file. Your private key stays in this browser and is used to authenticate your submissions.')}</div>
               </div>
             </li>
             <li>
               <span>${icon('code')}</span>
               <div>
-                <strong>Ship something useful</strong>
-                <p>The bot opens your pull request without a personal GitHub login.</p>
+                <div class="inline-guidance"><strong>Ship something useful</strong>${help('About submitting code', 'The bot opens your pull request without a personal GitHub login. Your code, file path, title, and description are public on GitHub.')}</div>
               </div>
             </li>
             <li>
               <span>${icon('shield')}</span>
               <div>
-                <strong>Let the work count</strong>
-                <p>GitHub merge checks update your contribution history in this workspace.</p>
+                <div class="inline-guidance"><strong>Let the work count</strong>${help('About merge verification', 'GitHub merge checks update your contribution history in this workspace. A maintainer reviews the PR; GhostCommits then verifies merge evidence from GitHub.')}</div>
               </div>
             </li>
             <li>
               <span>${icon('wallet')}</span>
               <div>
-                <strong>Claim your reward</strong>
-                <p>Sign a cryptographic claim for a private testnet payout.</p>
+                <div class="inline-guidance"><strong>Claim your reward</strong>${help('About reward claims', 'Sign a cryptographic claim for a shielded testnet payout. The sponsor reviews the claim and approves payment in Noir Wallet. Testnet ZEC has no monetary value.')}</div>
               </div>
             </li>
           </ol>
@@ -246,8 +243,7 @@ export function bountyDetail(state) {
         <ul class="criteria">
           ${b.criteria.map((item) => `<li>${icon('check')}<span>${e(item)}</span></li>`).join('')}
         </ul>
-        <h2>How your contribution is reviewed</h2>
-        <p class="body-copy">A maintainer reviews your pull request on GitHub. Once it is merged, GhostCommits verifies the merge evidence. You can then prove ownership using your Ghost key and sign a reward claim. The sponsor reviews the claim before authorizing a shielded transfer.</p>
+        <div class="review-guidance">${guidance('How your contribution is reviewed', 'A maintainer reviews your pull request on GitHub. Once it is merged, GhostCommits verifies the merge evidence. You can then prove ownership using your Ghost key and sign a reward claim. The sponsor reviews the claim before authorizing a shielded transfer.')}</div>
         <div class="detail-links">
           ${b.configured ? link(`https://github.com/${b.repository}`, 'View repository on GitHub', 'button secondary') : '<span class="muted small">Repository access has not been configured.</span>'}
           ${b.issueUrl ? link(b.issueUrl, 'View linked issue', 'button secondary') : ''}
@@ -267,7 +263,8 @@ export function bountyDetail(state) {
           <a class="button primary full" href="#${state.identity ? `submit/${e(b.id)}` : 'identity'}">
             ${state.identity ? 'Start contribution' : 'Create Ghost to contribute'} ${icon('arrow')}
           </a>
-          <p class="small muted">Your code and PR description are published under the bot. Repository visibility determines who can read them. Rewards require sponsor approval and are not held in escrow.</p>
+          <p class="small muted">Rewards require sponsor approval. No escrow.</p>
+          ${guidance('Publishing & payment details', 'Your code and PR description are published under the bot. Repository visibility determines who can read them. Rewards require sponsor approval and are not held in escrow.')}
           ${b.awardAvailable === false ? '<p class="small muted">The single award has already been claimed. Further submissions do not have an available bounty reward.</p>' : ''}
         </div>
         ${privacyNote()}
@@ -282,15 +279,12 @@ export function identityView(state) {
       ${pageHeading('A fresh identity. <span class="text-accent-red">The same you.</span>', 'Your contributions deserve a verifiable history. Your personal GitHub stays yours.')}
       <div class="onboarding panel">
         <div class="identity-art">
-          <div class="art-glow"></div>
           <img src="/ghost.svg" alt="" width="92" height="92"/>
-          <div class="identity-orbit orbit-one"></div>
-          <div class="identity-orbit orbit-two"></div>
           <span class="art-label">Your identity. Your signing key.</span>
         </div>
         <div class="onboarding-copy">
           <h2>Meet your Ghost.</h2>
-          <p>A local asymmetric signing key is all you need to get started. No personal GitHub login. No email address. Your activity remains linked to your Ghost.</p>
+          <div class="onboarding-intro">${guidance('No GitHub login. No email. Just your key.', 'A local asymmetric signing key is all you need to get started. No personal GitHub login. No email address. Your activity remains linked to your Ghost.')}</div>
           <ul class="criteria">
             <li>${icon('check')}<span>Authenticate submissions with your Ghost identity</span></li>
             <li>${icon('check')}<span>Track GitHub-verified merges in this workspace</span></li>
@@ -339,8 +333,7 @@ export function identityView(state) {
         ${state.submissions.length ? contributionList(state.submissions) : empty('branch', 'A blank canvas, full of possibility', 'Verified merged contributions will appear here. No noise, just verified code.', '<a href="#bounties" class="button secondary">Find your first bounty ' + icon('arrow') + '</a>')}
       </section>
       <aside class="panel key-panel">
-        <h3>Identity & recovery</h3>
-        <p>Your public-key fingerprint identifies this Ghost across bounties and claims. Safe to share publicly.</p>
+        <div class="inline-guidance"><h3>Identity & recovery</h3>${help('About your public fingerprint', 'Your public-key fingerprint identifies this Ghost across bounties and claims. Safe to share publicly. Your private recovery key should never be shared.')}</div>
         <code class="fingerprint">${e((state.fingerprint.match(/.{1,8}/g) || []).join(' '))}</code>
         <button class="button secondary full" data-action="export-key">${icon('download')} Export recovery key</button>
         <label class="import-link">
@@ -412,7 +405,7 @@ export function submitView(state) {
               <textarea name="content" class="code-input" rows="14" required maxlength="120000" spellcheck="false" placeholder="// Paste your complete source code here...">${e(d.content)}</textarea>
             </label>
             <div class="form-actions">
-              <span class="small muted">Draft is stored locally in memory in this browser tab.</span>
+              ${guidance('Draft storage', 'Draft is stored locally in memory in this browser tab. Closing or reloading the tab clears your draft.')}
               <button class="button primary">Review contribution ${icon('arrow')}</button>
             </div>
           </form>
@@ -426,10 +419,8 @@ export function submitView(state) {
           <p class="target-title">${e(state.config.bounty.title)}</p>
           <hr/>
           <div class="privacy-columns">
-            <h4>${icon('external')} Public on GitHub</h4>
-            <p>Code patch, file path, title, PR description, bot commit attribution.</p>
-            <h4>${icon('lock')} Kept confidential</h4>
-            <p>Your private key stays in your browser. No personal GitHub login is required. The sponsor and operator can see your receiving address.</p>
+            <div class="inline-guidance"><h4>${icon('external')} Public on GitHub</h4>${help('What is public on GitHub', 'Code patch, file path, title, PR description, bot commit attribution. Check for personal emails, secrets, and local paths before publishing.')}</div>
+            <div class="inline-guidance"><h4>${icon('lock')} Kept confidential</h4>${help('What stays confidential', 'Your private key stays in your browser. No personal GitHub login is required. The sponsor and operator can see your receiving address.')}</div>
           </div>
         </div>
         ${!state.config.bounty.configured ? '<div class="notice amber">GitHub credentials are not yet configured on the server. You can prepare and preview drafts, but publishing is disabled.</div>' : ''}
@@ -608,7 +599,8 @@ export function sponsorView(state) {
       <div class="sponsor-login panel">
         <span class="empty-icon">${icon('wallet')}</span>
         <h2>Sponsor Desk</h2>
-        <p>Sign in with your own GitHub account, install the bot on a repository you maintain, and publish a testnet bounty.</p>
+        <p>Publish a bounty for your repository.</p>
+        ${guidance('Maintainer setup', 'Sign in with your own GitHub account, install the bot on a repository you maintain, and publish a testnet bounty. Contributors use a separate Ghost identity; maintainers sign in with GitHub to manage repositories.')}
         ${state.config.maintainerConfigured ? '<a class="button primary full" href="/api/github/login">Continue with GitHub</a>' : '<p class="notice amber">GitHub sign-in is awaiting site configuration. The operator must add the GitHub App credentials in Netlify.</p>'}
         ${state.config.sponsorConfigured ? '<details><summary>Legacy operator access</summary><form id="sponsor-login"><label>Access key<input name="token" type="password" required autocomplete="off"/></label><button class="button secondary">Open operator desk</button></form></details>' : ''}
       </div>
@@ -739,7 +731,7 @@ export function privacyView() {
 function maintainerSetup(state) {
   const mine = (state.config.bounties || []).filter((b) => b.maintainerId === state.maintainer.id);
   return `<section class="panel maintainer-setup"><h2>Welcome, ${e(state.maintainer.login)}</h2>
-    <p>Install GhostCommits on a public repository where you have admin or maintainer access. Then refresh the list and publish a one-file task.</p>
+    ${guidance('Connect a repository to get started.', 'Install GhostCommits on a public repository where you have admin or maintainer access. Then refresh the list and publish a one-file task.')}
     <div class="form-actions"><button class="button secondary" data-action="connect-github">Install GitHub App</button><button class="button secondary" data-action="load-repositories">Refresh repositories</button></div>
     ${state.githubInstallUrl ? `<p>${link(state.githubInstallUrl, 'Continue installation on GitHub', 'button primary')}</p>` : ''}
     ${
@@ -750,11 +742,12 @@ function maintainerSetup(state) {
       <label>Description<textarea name="description" required maxlength="6000" rows="3"></textarea></label>
       <label>Acceptance criteria (one per line)<textarea name="criteria" required maxlength="3000" rows="3"></textarea></label>
       <label>Testnet ZEC reward<input name="amount" type="number" min="0.00000001" max="100" step="0.00000001" value="0.01" required/></label>
-      <p class="small muted">Terms are fixed when published. You fund the reward from your Noir testnet wallet when selecting a merged contribution. No funds are held in escrow.</p>
+      <p class="small muted">Terms are fixed when published. No funds are held in escrow.</p>
+      ${guidance('How rewards are funded', 'You fund the reward from your Noir testnet wallet when selecting a merged contribution. Terms are fixed when published. No funds are held in escrow.')}
       <button class="button primary">Publish bounty</button>
     </form>`
         : '<p class="small muted">Install the app, then refresh repositories. Only active public repositories you maintain are shown.</p>'
     }
-    ${mine.length ? `<h3>Your published bounties</h3>${mine.map((b) => `<p><a href="#bounty/${e(b.id)}">${e(b.title)}</a> � ${e(b.amount)} testnet ZEC</p>`).join('')}` : ''}
+    ${mine.length ? `<h3>Your published bounties</h3>${mine.map((b) => `<p><a href="#bounty/${e(b.id)}">${e(b.title)}</a> · ${e(b.amount)} testnet ZEC</p>`).join('')}` : ''}
   </section>`;
 }

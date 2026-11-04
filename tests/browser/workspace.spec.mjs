@@ -98,3 +98,112 @@ test('Ghost creation and second-bounty draft preserve the target', async ({ page
   await expect(page.locator('main')).toContainText('other/project');
   await expect(page.locator('main')).toContainText('A complete example.');
 });
+
+test('info help supports focus, hover, tap, and dismissal without leaving the viewport', async ({
+  page,
+  isMobile,
+}) => {
+  await mockApi(page);
+  await page.goto('/');
+  const trigger = page.getByRole('button', { name: 'How it works', exact: true });
+  const tooltip = page.getByRole('tooltip');
+  if (isMobile) await trigger.tap();
+  else await trigger.hover();
+  await expect(tooltip).toBeVisible();
+  await expect(tooltip).toContainText('A merge does not guarantee a reward');
+  await expect(trigger).toHaveAttribute('aria-describedby', 'context-help');
+  expect(
+    await tooltip.evaluate((element) => {
+      const bounds = element.getBoundingClientRect();
+      return (
+        bounds.left >= 0 &&
+        bounds.right <= innerWidth &&
+        bounds.top >= 0 &&
+        bounds.bottom <= innerHeight
+      );
+    }),
+  ).toBe(true);
+  if (!isMobile) {
+    await tooltip.hover();
+    await expect(tooltip).toBeVisible();
+  }
+  await page.keyboard.press('Escape');
+  await expect(tooltip).not.toBeVisible();
+  await expect(trigger).not.toHaveAttribute('aria-describedby');
+  await page.getByRole('link', { name: 'Publish a bounty' }).focus();
+  await trigger.focus();
+  await expect(tooltip).toBeVisible();
+  await page.keyboard.press('Tab');
+  await expect(tooltip).not.toBeVisible();
+  await trigger.click();
+  await expect(tooltip).toBeVisible();
+  await trigger.click();
+  await expect(tooltip).not.toBeVisible();
+  await trigger.click();
+  await page.locator('.page-heading h1').click();
+  await expect(tooltip).not.toBeVisible();
+  await trigger.click();
+  await page.getByRole('link', { name: 'My Ghost', exact: true }).click();
+  await expect(tooltip).not.toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Meet your Ghost.' })).toBeVisible();
+});
+
+test('the workspace stays still and respects reduced motion', async ({ page }) => {
+  await mockApi(page);
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto('/#identity');
+  await expect(page.getByRole('heading', { name: 'Meet your Ghost.' })).toBeVisible();
+  await expect(page.locator('.fixed-bg, .identity-orbit, .art-glow')).toHaveCount(0);
+  expect(
+    await page.evaluate(
+      () =>
+        document
+          .getAnimations()
+          .filter((animation) => animation.effect.getTiming().iterations === Infinity).length,
+    ),
+  ).toBe(0);
+  const trigger = page.getByRole('button', { name: 'No GitHub login. No email. Just your key.' });
+  await trigger.click();
+  await expect(page.getByRole('tooltip')).toBeVisible();
+  expect(
+    await page.getByRole('tooltip').evaluate((element) => getComputedStyle(element).transform),
+  ).toBe('none');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
+
+test('sidebar retracts, remembers its state, and preserves form input', async ({ page }) => {
+  await mockApi(page);
+  await page.goto('/');
+  const sidebar = page.locator('#workspace-sidebar');
+  await page.getByRole('button', { name: 'Collapse sidebar', exact: true }).click();
+  const expand = page.getByRole('button', { name: 'Expand sidebar', exact: true });
+  await expect(expand).toHaveAttribute('aria-expanded', 'false');
+  await expect(sidebar).toHaveAttribute('inert');
+  await expect(sidebar).toHaveAttribute('aria-hidden', 'true');
+  await expect(page.locator('.topbar-brand')).toBeVisible();
+  await expect(page.locator('.topbar-brand img')).toHaveCount(0);
+  await page.reload();
+  await expect(expand).toBeVisible();
+  await expect(expand).toHaveAttribute('aria-expanded', 'false');
+  await expand.focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('button', { name: 'Collapse sidebar', exact: true })).toBeFocused();
+  await expect(sidebar).not.toHaveAttribute('inert');
+  await expect(page.getByRole('link', { name: 'My Ghost', exact: true })).toBeVisible();
+  await page.getByRole('link', { name: 'My Ghost', exact: true }).click();
+  await page.locator('[data-action="create-identity"]').click();
+  await page.goto('/#submit/bounty-a');
+  await page.locator('input[name="title"]').fill('Keep this unsaved draft');
+  await page.locator('textarea[name="description"]').fill('Keep this description, too.');
+  await page.getByRole('button', { name: 'Collapse sidebar', exact: true }).click();
+  await expect(page.locator('input[name="title"]')).toHaveValue('Keep this unsaved draft');
+  await page.getByRole('button', { name: 'Expand sidebar', exact: true }).click();
+  await expect(page.locator('textarea[name="description"]')).toHaveValue(
+    'Keep this description, too.',
+  );
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.getByRole('button', { name: 'Collapse sidebar', exact: true }).click();
+  await page.goto('/#privacy');
+  await expect(page.getByRole('button', { name: 'Expand sidebar', exact: true })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
