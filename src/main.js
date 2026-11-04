@@ -70,6 +70,7 @@ function render() {
 }
 async function refreshContributions() {
   if (state.identity) state.submissions = await authenticated(state.identity, '/submissions');
+  state.config = await request('/config');
 }
 async function refreshSponsor() {
   if (state.sponsorToken)

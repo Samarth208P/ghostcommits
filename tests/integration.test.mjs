@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { generateKeyPairSync, sign } from 'node:crypto';
 import { once } from 'node:events';
-import { identityView, submitView, sponsorView } from '../src/views.js';
+import { identityView, submitView, sponsorView, bounties } from '../src/views.js';
 
 test('identity renders while fingerprint is loading and draft HTML is escaped', () => {
   const state = {
@@ -24,16 +24,22 @@ test('identity renders while fingerprint is loading and draft HTML is escaped', 
   state.claims = [];
   state.config.githubAppConfigured = true;
   assert.match(sponsorView(state), /data-action="check-github"/);
+  state.config.bounty.configured = true;
+  state.config.bounty.awardAvailable = false;
+  assert.match(bounties(state), /award already claimed/);
+  assert.doesNotMatch(bounties(state), /1 award open/);
 });
 
 test('isolated HTTP flow: authentication, validation, payout reservation and persistence', async (t) => {
   const cwd = await mkdtemp(join(tmpdir(), 'ghostcommits-test-'));
+  const keys = generateKeyPairSync('ed25519');
+  const publicKey = keys.publicKey.export({ type: 'spki', format: 'der' }).subarray(-32).toString('base64');
   await mkdir(join(cwd, 'data'));
   await writeFile(
     join(cwd, 'data/store.json'),
     JSON.stringify({
       submissions: [],
-      claims: [{ id: 'claim-1', status: 'awaiting-sponsor', amount: '0.5' }],
+      claims: [{ id: 'claim-1', bountyId: 'bounty-001', status: 'awaiting-sponsor', amount: '0.5', publicKey, challengeId: 'persisted-challenge', signature: 'persisted-signature' }],
     }),
   );
   const env = {
@@ -81,15 +87,12 @@ test('isolated HTTP flow: authentication, validation, payout reservation and per
     return { status: response.status, body: await response.json() };
   };
   assert.equal((await call('/config')).body.bounty.configured, false);
+  assert.equal((await call('/config')).body.bounty.awardAvailable, false);
   assert.equal((await call('/config', undefined, undefined, 'https://other.invalid')).status, 403);
   for (const input of [null, [], 'text', 1])
     assert.equal((await call('/auth/challenge', input)).status, 400);
   assert.equal((await call('/submissions')).status, 401);
-  const keys = generateKeyPairSync('ed25519');
-  const publicKey = keys.publicKey
-    .export({ type: 'spki', format: 'der' })
-    .subarray(-32)
-    .toString('base64');
+  assert.equal((await call('/auth/challenge', { publicKey: [publicKey] })).status, 400);
   const challenge = (await call('/auth/challenge', { publicKey })).body;
   const proof = {
     id: challenge.id,
@@ -97,6 +100,11 @@ test('isolated HTTP flow: authentication, validation, payout reservation and per
   };
   const token = (await call('/auth/verify', proof)).body.token;
   assert.ok(token);
+  const retry = { id: 'persisted-challenge', signature: 'persisted-signature' };
+  const retried = await Promise.all([call('/claims', retry, token), call('/claims', retry, token)]);
+  assert.deepEqual(retried.map((r) => r.body.id), ['claim-1', 'claim-1']);
+  assert.equal((await call('/claims', { ...retry, signature: 'wrong' }, token)).status, 401);
+  assert.equal((await call('/claims', {}, token)).status, 400);
   assert.equal((await call('/auth/verify', proof)).status, 401);
   assert.deepEqual((await call('/submissions', undefined, token)).body, []);
   assert.equal((await call('/submissions', {}, token)).status, 503);

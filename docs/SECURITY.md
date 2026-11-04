@@ -1,6 +1,6 @@
 # Privacy and security requirements
 
-Status: MVP requirements. Source implementation exists; no security audit, tests, or runtime verification has taken place. See [implementation status](IMPLEMENTATION_STATUS.md) for current limits.
+Status: MVP requirements. Source implementation exists, and automated regression checks and the production build pass. No independent security audit has taken place; live GitHub and wallet verification remains outstanding. See [implementation status](IMPLEMENTATION_STATUS.md) for current limits.
 
 ## Intended privacy boundary
 
@@ -42,7 +42,7 @@ The backend may observe network metadata and correlate submissions with receivin
 |---|---|
 | Another key attempts to claim a submission | Rejected. |
 | A signed address or reward identifier is changed | Rejected. |
-| A challenge expires or is replayed | Rejected. |
+| A challenge expires or is replayed | Rejected for a new action. An exact authenticated retry of a persisted claim returns the original record without creating another award. |
 | Two claim requests arrive concurrently | At most one eligible claim is consumed for the reward. |
 | The client reports an unmerged PR as merged | No reputation or payout eligibility granted. |
 | Merge verification runs repeatedly | Reputation credited once. |
@@ -52,4 +52,4 @@ The backend may observe network metadata and correlate submissions with receivin
 
 ## Later hardening
 
-Production use would require stronger encrypted key storage and recovery, scoped GitHub App installation, abuse controls, robust persistent storage, payment reconciliation, retention enforcement, and an independent security review. Selective disclosure and resistance to network-level correlation require additional design beyond this MVP.
+Production use would require stronger encrypted key storage and recovery, abuse controls, robust persistent storage, payment reconciliation, retention enforcement, and an independent security review. Repository-scoped GitHub App integration is implemented but still requires live validation. Selective disclosure and resistance to network-level correlation require additional design beyond this MVP.

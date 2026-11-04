@@ -7,7 +7,8 @@ export function fail(message, status = 400) {
   throw Object.assign(new Error(message), { status });
 }
 export function issueChallenge(publicKey, purpose, payload = {}) {
-  if (!/^[A-Za-z0-9+/]{43}=$/.test(publicKey || '')) fail('Invalid Ed25519 public key.');
+  if (typeof publicKey !== 'string' || !/^[A-Za-z0-9+/]{43}=$/.test(publicKey))
+    fail('Invalid Ed25519 public key.');
   const now = Date.now();
   for (const [key, item] of challenges) if (item.expiresAt < now) challenges.delete(key);
   if (challenges.size >= 5000) fail('Too many active challenges. Try again shortly.', 429);

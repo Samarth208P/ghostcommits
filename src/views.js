@@ -59,7 +59,7 @@ export function shell(state, content) {
           ${nav('identity', 'My Ghost', 'ghost', page === 'identity')}
         </nav>
         <div class="sidebar-divider"></div>
-        <div class="workspace-label">PROTOCOL DESK</div>
+        <div class="workspace-label">WORKSPACE TOOLS</div>
         <nav aria-label="Resources">
           ${nav('sponsor', 'Sponsor desk', 'wallet', page === 'sponsor')}
           ${nav('privacy', 'Privacy & security', 'shield', page === 'privacy')}
@@ -98,7 +98,7 @@ export function shell(state, content) {
         </main>
         <div class="huge-watermark" aria-hidden="true"><span>GHOSTCOMMITS</span></div>
         <footer class="workspace-footer">
-          <span>Build in public. Stay private. Get paid.</span>
+          <span>Public code. A separate identity. Testnet rewards.</span>
           <span>Made for open source <span class="footer-dot">·</span> Powered by Zcash Shielded Testnet</span>
         </footer>
       </div>
@@ -126,26 +126,26 @@ export function bounties(state) {
       <div class="intro-mark">${icon('ghost')}</div>
       <div class="intro-content">
         <strong>Public contributions. Pseudonymous ownership.</strong>
-        <p>Submit patches through a verified bot, prove your authorship with local keys, and claim shielded Zcash bounties.</p>
+        <p>Submit one file through the repository bot, prove control of your Ghost identity, and request a sponsor-approved testnet reward.</p>
       </div>
       <a href="#identity" class="intro-action">${state.identity ? 'View your Ghost' : 'Create your Ghost'} ${icon('arrow')}</a>
     </div>
     <div class="section-heading">
-      <div class="tab-label">Available bounties <span>1</span></div>
-      <span class="muted small">${b.configured ? 'Active repository · 1 award open' : 'Sample workspace · configuration required'}</span>
+      <div class="tab-label">${b.configured ? 'Configured bounty' : 'Sample bounty'} <span>1</span></div>
+      <span class="muted small">${b.configured ? (b.awardAvailable === false ? 'Active repository · award already claimed' : 'Active repository · 1 award open') : 'Sample workspace · configuration required'}</span>
     </div>
     <div class="discovery-grid">
       <div>
         <a class="bounty-card" href="#bounty">
           <div class="card-top">
             ${repo(b.repository)}
-            ${badge(b.configured ? 'Open for PRs' : 'Sample bounty', b.configured ? 'green' : 'neutral')}
+            ${badge(b.configured ? (b.awardAvailable === false ? 'Award claimed' : 'Open for PRs') : 'Sample bounty', b.configured ? 'green' : 'neutral')}
           </div>
           <h2>${e(b.title)}</h2>
           <p>${e(b.description)}</p>
           <div class="tags">
             <span>Open source</span>
-            <span>Wallet infrastructure</span>
+            <span>One repository</span>
             <span>Single award</span>
             <span>Shielded Sapling</span>
           </div>
@@ -188,7 +188,7 @@ export function bounties(state) {
               <span>${icon('shield')}</span>
               <div>
                 <strong>Let the work count</strong>
-                <p>Verified maintainer merges build your public record.</p>
+                <p>GitHub merge checks update your contribution history in this workspace.</p>
               </div>
             </li>
             <li>
@@ -216,7 +216,7 @@ export function bountyDetail(state) {
       <article class="panel bounty-detail">
         <div class="card-top">
           ${repo(b.repository)}
-          ${badge(b.configured ? 'Open for contributions' : 'Sample bounty', b.configured ? 'green' : 'neutral')}
+          ${badge(b.configured ? (b.awardAvailable === false ? 'Award claimed' : 'Open for contributions') : 'Sample bounty', b.configured ? 'green' : 'neutral')}
         </div>
         <h2>The objective</h2>
         <p class="body-copy">${e(b.description)}</p>
@@ -245,7 +245,8 @@ export function bountyDetail(state) {
           <a class="button primary full" href="#${state.identity ? 'submit' : 'identity'}">
             ${state.identity ? 'Start contribution' : 'Create Ghost to contribute'} ${icon('arrow')}
           </a>
-          <p class="small muted">Your code and PR description will be public on GitHub under the bot.</p>
+          <p class="small muted">Your code and PR description are published under the bot. Repository visibility determines who can read them. Rewards require sponsor approval and are not held in escrow.</p>
+          ${b.awardAvailable === false ? '<p class="small muted">The single award has already been claimed. Further submissions do not have an available bounty reward.</p>' : ''}
         </div>
         ${privacyNote()}
       </aside>
@@ -263,14 +264,14 @@ export function identityView(state) {
           <img src="/ghost.svg" alt="" width="92" height="92"/>
           <div class="identity-orbit orbit-one"></div>
           <div class="identity-orbit orbit-two"></div>
-          <span class="art-label">Your work, cryptographically signed.</span>
+          <span class="art-label">Your identity. Your signing key.</span>
         </div>
         <div class="onboarding-copy">
           <h2>Meet your Ghost.</h2>
           <p>A local asymmetric signing key is all you need to get started. No personal GitHub login. No email address. Your activity remains linked to your Ghost.</p>
           <ul class="criteria">
-            <li>${icon('check')}<span>Prove cryptographic ownership of all your patches</span></li>
-            <li>${icon('check')}<span>Build a permanent, verifiable contribution record</span></li>
+            <li>${icon('check')}<span>Authenticate submissions with your Ghost identity</span></li>
+            <li>${icon('check')}<span>Track GitHub-verified merges in this workspace</span></li>
             <li>${icon('check')}<span>Sign claims for shielded Zcash testnet rewards</span></li>
           </ul>
           <button class="button primary" data-action="create-identity">${icon('plus')} Create Ghost identity</button>
@@ -285,7 +286,7 @@ export function identityView(state) {
 
   const merged = state.submissions.filter((s) => s.evidence?.merged);
   return `
-    ${pageHeading('My Ghost', 'A verifiable record of what you ship, without exposing your personal identity.')}
+    ${pageHeading('My Ghost', 'Your contribution history under a separate identity. Public profiles and portable credentials are not included.')}
     <div class="profile-header panel">
       <span class="large-avatar">${icon('ghost')}</span>
       <div>
@@ -456,7 +457,7 @@ export function contributionsView(state) {
       s.pr ? `PR #${s.pr.number} · bot attribution` : 'PR creation is pending. You can retry with the same submission.',
     ],
     [
-      'Merge verified with commit proof',
+      'Merge checked against GitHub',
       Boolean(s.evidence?.merged),
       s.evidence?.merged
         ? `Checked ${date(s.evidence.checkedAt)}`
@@ -470,7 +471,7 @@ export function contributionsView(state) {
       s.claim ? 'Ownership signature verified on server.' : 'Available after merge verification.',
     ],
     [
-      'Shielded payment recorded',
+      'Transaction ID recorded — unverified',
       Boolean(s.claim?.txid),
       s.claim?.txid
         ? 'Transaction recorded. Verify receipt in your Noir / Zcash wallet.'
@@ -522,6 +523,8 @@ export function contributionsView(state) {
             ${s.claim.status === 'awaiting-sponsor' ? 'Your signed claim is queued for sponsor approval.' : s.claim.status === 'payment-reserved' ? 'The sponsor has reserved this payout.' : 'A transaction ID has been recorded. Check your wallet history.'}
           </p>
           ${s.claim.txid ? `<code class="fingerprint">${e(s.claim.txid)}</code>` : ''}
+        ` : state.config.bounty.awardAvailable === false ? `
+          <p class="muted small">This bounty's single award has already been claimed.</p>
         ` : s.evidence?.merged ? `
           <form id="claim-form" data-id="${e(s.id)}">
             <label>
@@ -586,7 +589,7 @@ export function sponsorView(state) {
         <div class="sponsor-claim-grid">
           <div>
             ${repo(claim.submission.repository)}
-            <p>Verified merged PR #${claim.submission.pr.number}</p>
+            <p>Verified merged PR #${e(claim.submission.pr.number)}</p>
             ${link(claim.submission.pr.url, 'Review contribution on GitHub', 'quiet-link')}
             <label class="address-label">
               Receiving Sapling address
@@ -625,7 +628,7 @@ export function privacyView() {
     ${pageHeading('Privacy, with clear boundaries.', 'Understand exactly what is public on GitHub, what stays local in your browser, and who sees the rest.')}
     <div class="privacy-document panel">
       <h2>Public code. Cryptographic pseudonymity.</h2>
-      <p>GhostCommits creates contributions through an authorized GitHub bot. Your personal GitHub account is not required, but the code, file names, PR title, description, and commit diffs are public on GitHub. Personal information embedded in your code could still identify you.</p>
+      <p>GhostCommits creates contributions through an authorized GitHub bot. Your personal GitHub account is not required. Code, file names, PR text, and commit diffs are visible to people with repository access, including everyone if the repository is public. Personal information embedded in your code could still identify you.</p>
       <div class="privacy-table">
         <div>
           <strong>Your browser</strong>
@@ -637,7 +640,7 @@ export function privacyView() {
         </div>
         <div>
           <strong>GitHub</strong>
-          <span>Pull requests are opened by the repository bot. Source code, commits, and comments are public to everyone.</span>
+          <span>Pull requests are opened by the repository bot. Repository visibility controls access to source code, commits, and comments.</span>
         </div>
         <div>
           <strong>Bounty sponsor</strong>
@@ -645,11 +648,11 @@ export function privacyView() {
         </div>
         <div>
           <strong>Zcash network</strong>
-          <span>Noir Wallet broadcasts shielded testnet transactions. Recipient addresses and transferred amounts remain shielded on-chain.</span>
+          <span>The app requests a transfer from shielded testnet funds to a Sapling testnet address through Noir Wallet. It does not independently verify broadcast, shielding, confirmation, or receipt. Check the wallet for payment evidence.</span>
         </div>
       </div>
       <h2>Identity persistence</h2>
-      <p>Using the same Ghost key links your contributions into a persistent, verifiable developer portfolio without tying it to your real-world identity.</p>
+      <p>Using the same Ghost key links your submissions in this workspace. Signatures prove control of that key, not original authorship of the code. History depends on the operator retaining server records; a recovery key alone does not restore those records. Public portfolios and independently verifiable credentials are not included. The operator, identifying code, or network information can still link activity to you.</p>
       <h2>Safe recovery practices</h2>
       <p>Always back up your recovery key file. If you switch browsers or clear your storage without an export, you lose control of that Ghost identity and any uncollected bounties.</p>
       <h2>Testnet environment</h2>

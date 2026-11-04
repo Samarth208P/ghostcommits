@@ -22,6 +22,7 @@ test('GitHub installation, token caching, interrupted PR retry and merge verific
   let tokenRequests = 0;
   let createdPR = false;
   let createAttempts = 0;
+  let mergeOverride = {};
   globalThis.fetch = async (url, options) => {
     const path = new URL(url).pathname;
     if (path === '/repos/owner/repo/installation')
@@ -52,11 +53,12 @@ test('GitHub installation, token caching, interrupted PR retry and merge verific
     }
     if (path === '/repos/owner/repo/pulls/42')
       return Response.json({
-        base: { repo: { full_name: 'owner/repo' } },
-        head: { ref: 'ghost/id-1' },
+        base: { ref: 'main', repo: { full_name: 'owner/repo' } },
+        head: { ref: 'ghost/id-1', repo: { full_name: 'owner/repo' } },
         merged: true,
         state: 'closed',
-        merge_commit_sha: 'merge-sha',
+        merge_commit_sha: 'a'.repeat(40),
+        ...mergeOverride,
       });
     throw new Error(`Unexpected GitHub request: ${options.method} ${url}`);
   };
@@ -76,7 +78,16 @@ test('GitHub installation, token caching, interrupted PR retry and merge verific
   assert.equal(submission.pr.number, 42);
   assert.equal(createAttempts, 1);
   assert.equal(tokenRequests, 1);
-  assert.equal((await github.verifyMerge(submission)).sha, 'merge-sha');
+  assert.equal((await github.verifyMerge(submission)).sha, 'a'.repeat(40));
+  for (const override of [
+    { base: { ref: 'other', repo: { full_name: 'owner/repo' } } },
+    { head: { ref: 'ghost/id-1', repo: { full_name: 'other/repo' } } },
+    { merge_commit_sha: null },
+    { base: null },
+  ]) {
+    mergeOverride = override;
+    await assert.rejects(github.verifyMerge(submission), /does not match/);
+  }
   await assert.rejects(
     github.createPullRequest({ ...submission, repository: 'other/repo' }),
     /different configured repository/,

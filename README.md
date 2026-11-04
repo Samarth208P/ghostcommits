@@ -1,12 +1,14 @@
 # GhostCommits
 
-**Build in public. Stay private. Get paid.**
+**Public code. A separate identity. Testnet rewards.**
 
 GhostCommits is a developer workspace for bot-authored GitHub contributions, pseudonymous contribution ownership, and shielded Zcash testnet bounty requests.
 
+The final MVP contract and release blockers are defined in [MVP scope and claim audit](docs/MVP_CONTRACT.md). A capability is not release-ready merely because source exists. This is a single-repository pilot, not a public bounty marketplace, anonymous portfolio service, or real-money payment product.
+
 ## Project status
 
-Application source is implemented. At the user's request, no tests, build, preview, or live integration trials have been run. Behavior remains unverified until you run it yourself.
+Application source is implemented. The automated regression suite and production build pass. Browser interaction checks remain incomplete, and real GitHub and Noir Wallet flows still require live verification. See [implementation status](docs/IMPLEMENTATION_STATUS.md) for the current evidence and limits.
 
 The initial target is a one-day MVP for the Free Society Hack, Zcash Privacy Track, using Zcash testnet exclusively.
 
@@ -30,7 +32,7 @@ The MVP excludes mainnet, arbitrary repository support, trustless escrow, and ze
 
 ## Reading the PRD
 
-The supplied PRD includes references to a "current prototype" and "current MVP." These are statements from the source document, not evidence of working software here. All capabilities remain planned until implemented and verified. External research and wallet compatibility claims in the PRD have not been independently checked during this documentation pass.
+The supplied PRD is preserved as the original product proposal. Its checkboxes, prototype descriptions, and roadmap are not the current implementation status. In particular, GitHub App connection and wallet request code now exist, while live integrations remain unverified. Use the implementation status document to distinguish implemented, tested, and deferred capabilities. External research claims in the PRD have not been independently verified.
 
 ## Run locally
 
@@ -66,7 +68,7 @@ Do not commit `.env` or private PEM keys. The bot creates branches in the config
 
 Create a Ghost in **My Ghost** and export its recovery file. The MVP stores private keys unencrypted in browser storage. Recovery exports contain the private key; keep them private. Losing the key means losing access to that identity.
 
-After a maintainer merges your PR, use **Check merge status**, then review and sign a reward claim. Claims bind the origin, submission, reward, amount, receiving address, nonce, and expiry. One claim is allowed for this single-award bounty.
+After a maintainer merges your PR, use **Check merge status**, then review and sign a reward claim. Claims bind the origin, submission, reward, amount, receiving address, nonce, and expiry. One claim is allowed for this single-award bounty. Retrying the same persisted claim with the same identity and signature returns the existing claim. The bounty displays whether its award has already been claimed; a claim is not proof of payment.
 
 Install the official [Noir Wallet testnet extension](https://docs.zknoir.com/noir-sdk-integration/), synchronize it, and fund it with shielded testnet ZEC. Open the sponsor desk, enter `SPONSOR_TOKEN`, connect the wallet, and review the work before approving. The integration follows the [Noir provider API](https://docs.zknoir.com/developers/provider-api/).
 

@@ -89,7 +89,11 @@ async function api(request, pathname) {
   const method = request.method;
   if (method === 'GET' && pathname === '/api/config')
     return {
-      bounty: { ...bounty, configured: githubReady },
+      bounty: {
+        ...bounty,
+        configured: githubReady,
+        awardAvailable: !snapshot().claims.some((claim) => claim.bountyId === bounty.id),
+      },
       githubAppConfigured: appConfigured,
       sponsorConfigured: Boolean(process.env.SPONSOR_TOKEN),
     };
@@ -232,15 +236,23 @@ async function api(request, pathname) {
     });
   }
   if (method === 'POST' && pathname === '/api/claims') {
-    const challenge = consumeChallenge(input.id, input.signature, 'claim');
-    if (challenge.publicKey !== publicKey) fail('Claim identity mismatch.', 403);
+    if (typeof input.id !== 'string' || typeof input.signature !== 'string')
+      fail('A claim challenge and signature are required.', 400);
     return transact((state) => {
+      // Return an already-persisted claim after a lost response, without creating
+      // another award or allowing a different identity/signature to replay it.
+      const existing = state.claims.find((claim) => claim.challengeId === input.id);
+      if (existing && existing.publicKey === publicKey && existing.signature === input.signature)
+        return visibleClaim(existing);
+      const challenge = consumeChallenge(input.id, input.signature, 'claim');
+      if (challenge.publicKey !== publicKey) fail('Claim identity mismatch.', 403);
       const submission = owned(state, challenge.submissionId, publicKey);
       if (!submission.evidence?.merged) fail('The contribution is not eligible.');
       if (state.claims.some((c) => c.bountyId === challenge.rewardId))
         fail('This bounty already has a claim.', 409);
       const claim = {
         id: randomUUID(),
+        challengeId: challenge.id,
         submissionId: submission.id,
         bountyId: challenge.rewardId,
         publicKey,

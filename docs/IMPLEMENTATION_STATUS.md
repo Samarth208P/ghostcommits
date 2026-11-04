@@ -4,6 +4,8 @@ Updated November 4, 2026. Dhananjay's frontend redesign is integrated with the G
 
 ## Verification
 
+- Maintenance checks on November 4 also cover persisted claim retries, malformed public-key input, claimed-award display, and rejection of merge evidence with a wrong base branch, source repository, or missing merge commit SHA. Both `npm test` and `npm run build` pass after these fixes. Live integrations were not exercised.
+
 - `npm test`: four regression groups cover identity rendering during startup, escaped draft previews, disabled publishing without configuration, session recovery after a server restart, JSON validation, signed login and replay rejection, origin restrictions, sponsor authorization, concurrent payout reservations, payment-record retry recovery, and disk persistence.
 - GitHub installation discovery, scoped token caching, interrupted PR creation retries, and merge evidence are checked with mocked GitHub responses and a temporary test signing key. No real GitHub writes occur in tests.
 - `npm run build` passes. Tests use isolated temporary storage and do not load the project's `.env`.
@@ -21,6 +23,8 @@ Updated November 4, 2026. Dhananjay's frontend redesign is integrated with the G
 - Serialized atomic JSON storage, request limits, nonce consumption, expiry, and Sapling address checksum validation.
 
 ## Limits
+
+- Product release blockers are tracked in [MVP contract](MVP_CONTRACT.md): sponsor selection/rejection instead of first-claim lockout, contributor revisions to existing PRs, immutable bounty terms, and real browser/GitHub/wallet completion evidence. Passing tests do not imply these capabilities exist.
 
 - One bounty, award, and repository. Do not repurpose persisted bounty terms by changing configuration mid-run.
 - One complete file per submission; no arbitrary patches, Git transport, or calculated Git diff.

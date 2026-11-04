@@ -1,6 +1,6 @@
 # Proposed architecture
 
-Status: original architecture proposal. Source implementation now exists; see [implementation status](IMPLEMENTATION_STATUS.md) for scope and limits. No runtime validation was performed, at the user's request.
+Status: original architecture proposal, retained for design context. Source implementation, automated regression checks, and a passing production build now exist; see [implementation status](IMPLEMENTATION_STATUS.md) for current scope and limits. Proposed records and open questions below are historical, not a description of unresolved implementation work. Live GitHub and wallet validation remains outstanding.
 
 ## Components
 

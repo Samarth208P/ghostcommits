@@ -49,8 +49,11 @@ export async function verifyMerge(submission) {
     throw new Error('This contribution belongs to a different configured repository.');
   const pr = await github(`/pulls/${submission.pr.number}`);
   if (
-    pr.base.repo.full_name.toLowerCase() !== submission.repository.toLowerCase() ||
-    pr.head.ref !== `ghost/${submission.id}`
+    pr.base?.repo?.full_name?.toLowerCase() !== submission.repository.toLowerCase() ||
+    pr.base.ref !== baseBranch ||
+    pr.head?.repo?.full_name?.toLowerCase() !== submission.repository.toLowerCase() ||
+    pr.head.ref !== `ghost/${submission.id}` ||
+    (pr.merged && !/^[a-f0-9]{40}$/i.test(pr.merge_commit_sha || ''))
   )
     throw new Error('The PR does not match this submission.');
   return {

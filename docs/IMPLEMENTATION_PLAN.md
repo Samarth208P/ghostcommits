@@ -1,6 +1,6 @@
 # Implementation plan
 
-Status: implementation authorized and source added. Acceptance items remain unchecked because the user requested no tests or trial runs. See [implementation status](IMPLEMENTATION_STATUS.md) for scope and gaps.
+Status: original implementation and acceptance checklist, retained for planning context. The unchecked boxes below are not current completion indicators. Source implementation, automated regression checks, and a passing production build now exist; see [implementation status](IMPLEMENTATION_STATUS.md) for current evidence and remaining live acceptance work.
 
 ## Phase 0: Validate prerequisites
 
@@ -69,4 +69,4 @@ Acceptance: all eight success criteria in PRD section 14 are demonstrated; any g
 
 ## Deferred scope
 
-Git remote transport, arbitrary repositories, GitHub App migration, stronger key recovery, signed credential export, selective disclosure, and production hardening remain outside the initial implementation unless scope is explicitly revised. Mainnet payments remain out of scope.
+Git remote transport, arbitrary repositories, stronger key recovery, signed credential export, selective disclosure, and production hardening remain outside the initial implementation unless scope is explicitly revised. GitHub App integration is implemented; its live validation remains outstanding. Mainnet payments remain out of scope.
