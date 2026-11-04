@@ -1,19 +1,33 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#101114" />
-    <meta
-      name="description"
-      content="Contribute to open source, build a pseudonymous reputation, and claim private Zcash testnet rewards."
-    />
-    <title>GhostCommits — Build in public. Stay private.</title>
-    <link rel="icon" href="/ghost.svg" type="image/svg+xml" />
-  </head>
-  <body>
-    <div id="app"></div>
-    <div id="notifications" role="status" aria-live="polite"></div>
-    <script type="module" src="/src/main.js"></script>
-  </body>
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#000000" />
+  <meta name="description"
+    content="Contribute to open source, build a pseudonymous reputation, and claim private Zcash testnet rewards." />
+  <title>GhostCommits — Build in public. Stay private.</title>
+  <link rel="icon" href="/ghost.svg" type="image/svg+xml" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Manrope:wght@300;400;500;600;700;800&display=swap"
+    rel="stylesheet" />
+</head>
+
+<body class="selection-red">
+  <!-- Cosmic noir ambient background -->
+  <div class="fixed-bg" aria-hidden="true">
+    <div class="bg-gradient-noir"></div>
+    <div class="stars-1"></div>
+    <div class="stars-2"></div>
+    <div class="glow-orb"></div>
+    <div class="grid-mesh"></div>
+  </div>
+  <div id="app"></div>
+  <div id="notifications" role="status" aria-live="polite"></div>
+  <script type="module" src="/src/main.js"></script>
+</body>
+
 </html>
