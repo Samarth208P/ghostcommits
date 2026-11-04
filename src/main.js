@@ -36,6 +36,7 @@ const state = {
   review: false,
   draft: { title: '', description: '', path: '', content: '', requestId: crypto.randomUUID() },
   pendingTx: {},
+  githubInstallUrl: '',
 };
 const app = document.querySelector('#app');
 let claimReview = null;
@@ -123,14 +124,22 @@ async function initialize() {
   render();
 }
 
+app.addEventListener('click', (event) => {
+  if (!event.target.closest('.skip-link')) return;
+  event.preventDefault();
+  document.querySelector('#main')?.focus();
+});
+
 window.addEventListener('hashchange', () => {
   state.route = location.hash.slice(1) || 'bounties';
   render();
   window.scrollTo({ top: 0 });
 });
 app.addEventListener('input', (event) => {
-  if (event.target.closest('#contribution-form'))
+  if (event.target.closest('#contribution-form')) {
     state.draft[event.target.name] = event.target.value;
+    state.draft.requestId = crypto.randomUUID();
+  }
 });
 app.addEventListener('change', (event) => {
   if (event.target.id !== 'import-key' || !event.target.files[0]) return;
@@ -145,6 +154,8 @@ app.addEventListener('change', (event) => {
     clearSession();
     state.fingerprint = await fingerprint(state.identity);
     state.submissions = [];
+    state.review = false;
+    render();
     await refreshContributions();
     render();
     notify('Identity restored.');
@@ -185,6 +196,20 @@ app.addEventListener('click', (event) => {
       render();
       notify('Pull request is ready.');
     }
+    if (action === 'connect-github') {
+      const result = await sponsor('/github/connect', {});
+      state.githubInstallUrl = result.url;
+      render();
+    }
+    if (action === 'check-github') {
+      try {
+        await sponsor('/github/check', {});
+        notify('GitHub repository connected. Contributions can now be published.');
+      } finally {
+        state.config = await request('/config');
+        render();
+      }
+    }
     if (action === 'connect-wallet') {
       const connected = await connectWallet();
       state.wallet = connected.wallet;
@@ -199,6 +224,7 @@ app.addEventListener('click', (event) => {
       state.sponsorToken = '';
       state.claims = [];
       state.wallet = null;
+      state.githubInstallUrl = '';
       render();
     }
     if (action === 'pay') {
@@ -288,8 +314,8 @@ function showClaimDialog(challenge) {
   });
   dialog.querySelector('#sign-claim').addEventListener('click', (event) =>
     busy(event.currentTarget, async () => {
-      const signature = await sign(state.identity, claimReview.message);
-      await authenticated(state.identity, '/claims', { id: claimReview.id, signature });
+      const signature = await sign(state.identity, challenge.message);
+      await authenticated(state.identity, '/claims', { id: challenge.id, signature });
       dialog.close();
       await refreshContributions();
       render();

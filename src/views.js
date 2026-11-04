@@ -88,7 +88,7 @@ export function shell(state, content) {
             <strong>${{ bounties: 'Discover', bounty: 'Bounty details', submit: 'New contribution', contributions: 'Contributions', identity: 'My Ghost', sponsor: 'Sponsor desk', privacy: 'Privacy dossier' }[page] || 'Discover'}</strong>
           </div>
           <div class="topbar-right">
-            ${badge('Testnet Live', 'neutral')}
+            ${badge('Testnet', 'neutral')}
             <a class="topbar-help" href="#privacy">${icon('lock')} <span>Privacy by intention</span></a>
           </div>
         </header>
@@ -114,7 +114,7 @@ export function bounties(state) {
         <span class="beacon-ping"></span>
         <span class="beacon-core"></span>
       </span>
-      <span class="live-pill-text">GhostCommits protocol is live on Zcash testnet</span>
+      <span class="live-pill-text">GhostCommits testnet workspace</span>
       <span class="live-pill-arrow">${icon('arrow')}</span>
     </div>
     ${pageHeading(
@@ -181,7 +181,7 @@ export function bounties(state) {
               <span>${icon('code')}</span>
               <div>
                 <strong>Ship something useful</strong>
-                <p>The bot opens your GitHub pull request anonymously.</p>
+                <p>The bot opens your pull request without a personal GitHub login.</p>
               </div>
             </li>
             <li>
@@ -267,7 +267,7 @@ export function identityView(state) {
         </div>
         <div class="onboarding-copy">
           <h2>Meet your Ghost.</h2>
-          <p>A local asymmetric signing key is all you need to get started. No personal GitHub login. No email address. Complete pseudonymity.</p>
+          <p>A local asymmetric signing key is all you need to get started. No personal GitHub login. No email address. Your activity remains linked to your Ghost.</p>
           <ul class="criteria">
             <li>${icon('check')}<span>Prove cryptographic ownership of all your patches</span></li>
             <li>${icon('check')}<span>Build a permanent, verifiable contribution record</span></li>
@@ -314,7 +314,7 @@ export function identityView(state) {
       <aside class="panel key-panel">
         <h3>Identity & recovery</h3>
         <p>Your public-key fingerprint identifies this Ghost across bounties and claims. Safe to share publicly.</p>
-        <code class="fingerprint">${e(state.fingerprint.match(/.{1,8}/g).join(' '))}</code>
+        <code class="fingerprint">${e((state.fingerprint.match(/.{1,8}/g) || []).join(' '))}</code>
         <button class="button secondary full" data-action="export-key">${icon('download')} Export recovery key</button>
         <label class="import-link">
           Restore another identity
@@ -398,7 +398,7 @@ export function submitView(state) {
             <h4>${icon('external')} Public on GitHub</h4>
             <p>Code patch, file path, title, PR description, bot commit attribution.</p>
             <h4>${icon('lock')} Kept confidential</h4>
-            <p>Your Ghost private key, personal GitHub user, and receiving wallet address.</p>
+            <p>Your private key stays in your browser. No personal GitHub login is required. The sponsor and operator can see your receiving address.</p>
           </div>
         </div>
         ${!state.config.bounty.configured ? '<div class="notice amber">GitHub credentials are not yet configured on the server. You can prepare and preview drafts, but publishing is disabled.</div>' : ''}
@@ -503,7 +503,7 @@ export function contributionsView(state) {
         </div>
         ${s.evidence?.sha ? `
           <details class="evidence">
-            <summary>View cryptographic merge evidence</summary>
+            <summary>View recorded merge evidence</summary>
             <dl>
               <dt>Repository</dt><dd>${e(s.repository)}</dd>
               <dt>Merge commit SHA</dt><dd class="mono break-all">${e(s.evidence.sha)}</dd>
@@ -564,6 +564,7 @@ export function sponsorView(state) {
 
   return `
     ${heading}
+    <section class="panel"><h2>Connect your GitHub repository</h2><p>Install GhostCommits on ${e(state.config.bounty.repository)} to let the bot open pull requests. Contributors keep their Ghost identities.</p><p>${badge(state.config.bounty.configured ? 'Repository connected' : 'Connection not checked', state.config.bounty.configured ? 'green' : 'neutral')}</p>${state.config.githubAppConfigured ? `<div class="form-actions"><button class="button secondary" data-action="connect-github">Connect GitHub</button><button class="button secondary" data-action="check-github">Check connection</button></div>${state.githubInstallUrl ? `<p>${link(state.githubInstallUrl, 'Continue on GitHub', 'button primary')}</p><p class="small muted">Choose the repository on GitHub, approve installation, then return here and check the connection.</p>` : ''}` : '<p>Server setup is required. Follow docs/GITHUB_APP_SETUP.md to register your GitHub App and configure its credentials.</p>'}</section>
     <div class="sponsor-toolbar">
       <span>${badge(state.wallet ? 'Noir Wallet connected' : 'Wallet disconnected', state.wallet ? 'green' : 'neutral')}</span>
       <div class="sponsor-actions">
@@ -574,7 +575,7 @@ export function sponsorView(state) {
     </div>
     <div class="notice">
       ${icon('info')}
-      <p>Payments use shielded testnet funds and require confirmation in Noir Wallet. A reservation prevents double transfers. Always confirm receipt in wallet history.</p>
+      <p>Payments use shielded testnet funds and require confirmation in Noir Wallet. A reservation blocks repeat payment attempts in this app. After an interruption, reconcile wallet history before taking further action.</p>
     </div>
     ${state.claims.length ? state.claims.map((claim) => `
       <article class="panel sponsor-claim">
@@ -610,7 +611,7 @@ export function sponsorView(state) {
               </form>
             ` : `
               <code class="fingerprint">${e(claim.txid)}</code>
-              <p class="small muted">Recorded transaction ID. Check confirmations in block explorer.</p>
+              <p class="small muted">Recorded, not independently confirmed. Verify receipt in the recipient wallet.</p>
             `}
           </div>
         </div>
@@ -628,7 +629,7 @@ export function privacyView() {
       <div class="privacy-table">
         <div>
           <strong>Your browser</strong>
-          <span>Your private signing key is stored locally in browser storage. It never leaves your device. Recovery exports contain this private key in unencrypted form.</span>
+          <span>Your private signing key is stored locally in browser storage. A compromised browser or device can expose it. Recovery exports contain this private key in unencrypted form.</span>
         </div>
         <div>
           <strong>GhostCommits server</strong>

@@ -47,7 +47,8 @@ Set these values in `.env` and restart:
 
 | Variable | Purpose |
 |---|---|
-| `GITHUB_TOKEN` | Fine-grained bot token with contents read/write and pull requests read/write for the selected repository. |
+| `GITHUB_APP_ID` | App ID from your registered GitHub App. |
+| `GITHUB_APP_PRIVATE_KEY_PATH` | Path to its private PEM signing key, kept outside public assets. |
 | `GITHUB_REPOSITORY` | Existing controlled repository in `owner/name` form. |
 | `GITHUB_BASE_BRANCH` | Existing branch; defaults to `main`. |
 | `SPONSOR_TOKEN` | Long randomly generated sponsor access secret. |
@@ -57,7 +58,9 @@ Set these values in `.env` and restart:
 | `BOUNTY_ISSUE_URL` | Optional GitHub issue URL. |
 | `APP_ORIGIN` | Exact browser origin; defaults to `http://localhost:5173`. |
 
-Do not commit `.env`. The bot creates branches in the configured repository; arbitrary repositories and fork workflows are unsupported. Each submission replaces one complete file on a new branch. Workflow files and Git internals are excluded. The review screen shows full file contents, not a calculated Git diff.
+Follow [GitHub App setup](docs/GITHUB_APP_SETUP.md) to register the app once, then connect it from the sponsor desk. Owners approve access on GitHub; contributors never need a GitHub login or personal access token. Check the connection again after restarting the backend.
+
+Do not commit `.env` or private PEM keys. The bot creates branches in the configured repository; arbitrary repositories and fork workflows are unsupported. Each submission replaces one complete file on a new branch. Workflow files and Git internals are excluded. The review screen shows full file contents, not a calculated Git diff.
 
 ## Identity and payouts
 
@@ -96,3 +99,8 @@ Set `APP_ORIGIN=http://localhost:3001` in `.env`, then run `npm start`. The back
 Runtime records live in Git-ignored `data/`. Run one backend process per data directory. Sessions and challenges expire on restart; contributions, claims, and payout reservations persist. Storage contains sensitive receiving addresses and must not be made public.
 
 See [implementation status](docs/IMPLEMENTATION_STATUS.md) for scope and remaining limitations.
+
+
+## Regression checks
+
+Run `npm test` for isolated API, client-session, rendering, and mocked GitHub integration checks. Tests use temporary storage and do not load `.env` or send GitHub/wallet requests. Run `npm run build` to verify the production bundle. These checks do not replace live GitHub installation and wallet validation.

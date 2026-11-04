@@ -25,7 +25,7 @@ export function transact(operation) {
     await writeFile(`${filename}.tmp`, JSON.stringify(draft, null, 2), { mode: 0o600 });
     await rename(`${filename}.tmp`, filename);
     state = draft;
-    return value;
+    return structuredClone(value);
   });
   queue = result.catch(() => {});
   return result;

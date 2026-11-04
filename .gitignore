@@ -4,3 +4,7 @@ dist/
 data/
 *.log
 .impeccable/
+
+# GitHub App signing keys
+secrets/
+*.pem

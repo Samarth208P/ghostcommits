@@ -1,37 +1,13 @@
+import { githubRequest, installationToken } from './github-app.mjs';
 const repository = process.env.GITHUB_REPOSITORY || '';
 const baseBranch = process.env.GITHUB_BASE_BRANCH || 'main';
-export const githubReady = Boolean(
-  process.env.GITHUB_TOKEN && /^[\w.-]+\/[\w.-]+$/.test(repository),
-);
-
 async function github(path, method = 'GET', body) {
-  if (!githubReady)
-    throw Object.assign(
-      new Error('Configure GITHUB_TOKEN and GITHUB_REPOSITORY before submitting.'),
-      { status: 503 },
-    );
-  const response = await fetch(`https://api.github.com/repos/${repository}${path}`, {
-    method,
-    headers: {
-      Authorization: `Bearer ${process.env.GITHUB_TOKEN}`,
-      Accept: 'application/vnd.github+json',
-      'X-GitHub-Api-Version': '2022-11-28',
-      'Content-Type': 'application/json',
-    },
-    body: body ? JSON.stringify(body) : undefined,
-    signal: AbortSignal.timeout(20000),
-  });
-  if (!response.ok)
-    throw Object.assign(
-      new Error(
-        `GitHub returned ${response.status}. Check repository access and branch configuration.`,
-      ),
-      { status: 502 },
-    );
-  return response.json();
+  return githubRequest(`/repos/${repository}${path}`, await installationToken(), method, body);
 }
 
 export async function createPullRequest(submission) {
+  if (submission.repository.toLowerCase() !== repository.toLowerCase())
+    throw new Error('This contribution belongs to a different configured repository.');
   const branch = `ghost/${submission.id}`;
   // Look up an existing PR first: retries must not create a second contribution.
   const existing = await github(
@@ -69,6 +45,8 @@ export async function createPullRequest(submission) {
 }
 
 export async function verifyMerge(submission) {
+  if (submission.repository.toLowerCase() !== repository.toLowerCase())
+    throw new Error('This contribution belongs to a different configured repository.');
   const pr = await github(`/pulls/${submission.pr.number}`);
   if (
     pr.base.repo.full_name.toLowerCase() !== submission.repository.toLowerCase() ||

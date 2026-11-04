@@ -1,11 +1,20 @@
 # Implementation status
 
-Updated November 4, 2026. Source is implemented; runtime behavior remains unverified. The user requested no tests or trial runs. No build, preview, browser checks, GitHub operations, or Zcash transfers were executed during implementation.
+Updated November 4, 2026. Dhananjay's frontend redesign is integrated with the GitHub App connection flow. The local production build and automated regression suite pass.
+
+## Verification
+
+- `npm test`: four regression groups cover identity rendering during startup, escaped draft previews, disabled publishing without configuration, session recovery after a server restart, JSON validation, signed login and replay rejection, origin restrictions, sponsor authorization, concurrent payout reservations, payment-record retry recovery, and disk persistence.
+- GitHub installation discovery, scoped token caching, interrupted PR creation retries, and merge evidence are checked with mocked GitHub responses and a temporary test signing key. No real GitHub writes occur in tests.
+- `npm run build` passes. Tests use isolated temporary storage and do not load the project's `.env`.
+- Browser interaction verification remains incomplete: the computer-use tool stopped because it could not reliably determine the current Chrome URL.
+- Live installation permissions, real PR creation and merge verification, Noir Wallet approval, and testnet receipt still require the configured environment and live verification.
 
 ## Source implementation
 
 - Responsive bounty, submission review, contribution timeline, recovery, sponsor desk, and privacy screens.
 - Local Ed25519 generation, fingerprint, recovery export/import, and signed sessions.
+- GitHub App installation connection from the sponsor desk; server-only, repository-restricted installation tokens with expiry refresh. Recheck connection after backend restart.
 - Configured-repository branches, bot commits, real PR creation, retry lookup, and merge evidence checks.
 - Reputation counts from stored verified merges and signed reward claims.
 - Sponsor authorization, persistent payout reservation, Noir testnet payment requests, and transaction recording.

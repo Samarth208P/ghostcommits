@@ -3,7 +3,8 @@ import { readFile } from 'node:fs/promises';
 import { resolve, extname, relative, isAbsolute } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { snapshot, transact } from './store.mjs';
-import { githubReady, createPullRequest, verifyMerge } from './github.mjs';
+import { createPullRequest, verifyMerge } from './github.mjs';
+import { githubReady, appConfigured, installationUrl, checkConnection } from './github-app.mjs';
 import {
   fail,
   issueChallenge,
@@ -55,11 +56,15 @@ async function body(request) {
     if (bytes > 180000) fail('Submission exceeds the 180 KB request limit.', 413);
     chunks.push(chunk);
   }
+  let input;
   try {
-    return JSON.parse(Buffer.concat(chunks).toString() || '{}');
+    input = JSON.parse(Buffer.concat(chunks).toString() || '{}');
   } catch {
     fail('Request must contain valid JSON.');
   }
+  if (!input || typeof input !== 'object' || Array.isArray(input))
+    fail('Request must contain a JSON object.');
+  return input;
 }
 function text(value, name, max) {
   if (typeof value !== 'string' || !value.trim() || value.length > max)
@@ -83,7 +88,11 @@ async function api(request, pathname) {
     fail('This origin is not allowed.', 403);
   const method = request.method;
   if (method === 'GET' && pathname === '/api/config')
-    return { bounty, sponsorConfigured: Boolean(process.env.SPONSOR_TOKEN) };
+    return {
+      bounty: { ...bounty, configured: githubReady },
+      githubAppConfigured: appConfigured,
+      sponsorConfigured: Boolean(process.env.SPONSOR_TOKEN),
+    };
   const input = method === 'POST' ? await body(request) : {};
   if (method === 'POST' && pathname === '/api/auth/challenge')
     return issueChallenge(input.publicKey, 'login');
@@ -93,6 +102,8 @@ async function api(request, pathname) {
   }
   if (pathname.startsWith('/api/sponsor')) {
     authenticateSponsor(request);
+    if (method === 'POST' && pathname === '/api/sponsor/github/connect') return installationUrl();
+    if (method === 'POST' && pathname === '/api/sponsor/github/check') return checkConnection();
     if (method === 'GET' && pathname === '/api/sponsor/claims')
       return snapshot().claims.map((claim) => ({
         ...visibleClaim(claim),
@@ -115,10 +126,12 @@ async function api(request, pathname) {
       return transact((state) => {
         const claim = state.claims.find((c) => c.id === input.id);
         if (!claim) fail('Claim not found.', 404);
+        if (typeof input.txid !== 'string' || !/^[a-fA-F0-9]{64}$/.test(input.txid))
+          fail('Enter the 64-character Zcash transaction ID.');
+        if (claim.status === 'recorded-unverified' && claim.txid === input.txid.toLowerCase())
+          return visibleClaim(claim);
         if (claim.status !== 'payment-reserved')
           fail('Reserve this payout before recording a transaction.', 409);
-        if (!/^[a-fA-F0-9]{64}$/.test(input.txid || ''))
-          fail('Enter the 64-character Zcash transaction ID.');
         if (state.claims.some((c) => c.txid === input.txid.toLowerCase()))
           fail('That transaction is already associated with a claim.', 409);
         claim.txid = input.txid.toLowerCase();
@@ -288,6 +301,6 @@ createServer(async (request, response) => {
       }),
     );
   }
-}).listen(Number(process.env.PORT || 3001), '127.0.0.1', () =>
-  console.log(`GhostCommits backend: http://localhost:${process.env.PORT || 3001}`),
-);
+}).listen(Number(process.env.PORT || 3001), '127.0.0.1', function () {
+  console.log(`GhostCommits backend: http://127.0.0.1:${this.address().port}`);
+});
