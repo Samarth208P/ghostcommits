@@ -6,10 +6,16 @@ const filename = resolve(directory, 'store.json');
 let queue = Promise.resolve();
 await mkdir(directory, { recursive: true });
 let state;
-try { state = JSON.parse(await readFile(filename, 'utf8')); }
-catch (error) { if (error.code !== 'ENOENT') throw error; state = { submissions: [], claims: [] }; }
+try {
+  state = JSON.parse(await readFile(filename, 'utf8'));
+} catch (error) {
+  if (error.code !== 'ENOENT') throw error;
+  state = { submissions: [], claims: [] };
+}
 
-export function snapshot() { return structuredClone(state); }
+export function snapshot() {
+  return structuredClone(state);
+}
 
 // One server process owns this store. A failed write never changes in-memory state.
 export function transact(operation) {
